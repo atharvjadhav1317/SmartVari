@@ -1,0 +1,47 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Notebook and tool output
+.ipynb_checkpoints/
+
+# Coverage and logs
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.log
+
+# Local databases and generated data
+*.sqlite
+*.sqlite3
+*.db
+ai/data/generated/
