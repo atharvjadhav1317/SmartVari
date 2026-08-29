@@ -1,0 +1,487 @@
+.smartvari-provider-shell {
+  min-height: calc(100vh - 72px);
+  padding: 28px 24px 48px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%);
+  color: #0f172a;
+  font-size: 0.8rem;
+}
+
+.smartvari-provider-shell * {
+  box-sizing: border-box;
+}
+
+.smartvari-provider-header {
+  max-width: 1280px;
+  margin: 0 auto 18px;
+  padding: 28px 28px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.06);
+}
+
+.smartvari-provider-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.smartvari-provider-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.smartvari-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 12px 20px rgba(249, 115, 22, 0.22);
+}
+
+.smartvari-provider-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 2vw, 2.5rem);
+  letter-spacing: -0.06em;
+}
+
+.smartvari-provider-subtitle {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.smartvari-provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.smartvari-primary-btn,
+.smartvari-secondary-btn,
+.smartvari-muted-btn,
+.smartvari-accept-btn,
+.smartvari-danger-btn {
+  appearance: none;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.smartvari-primary-btn,
+.smartvari-accept-btn {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff;
+  box-shadow: 0 12px 20px rgba(249, 115, 22, 0.18);
+}
+
+.smartvari-primary-btn {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
+.smartvari-secondary-btn {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: 10px 14px;
+}
+
+.smartvari-muted-btn {
+  background: rgba(148, 163, 184, 0.08);
+  color: #334155;
+  padding: 10px 14px;
+}
+
+.smartvari-accept-btn {
+  padding: 9px 12px;
+  font-size: 0.8rem;
+}
+
+.smartvari-danger-btn {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 9px 12px;
+}
+
+.smartvari-provider-content {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.smartvari-panel {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+}
+
+.smartvari-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 22px 14px;
+}
+
+.smartvari-panel-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.04em;
+}
+
+.smartvari-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.smartvari-status-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+}
+
+.smartvari-status-pill.available {
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+}
+
+.smartvari-status-pill.unavailable {
+  background: rgba(148, 163, 184, 0.1);
+  color: #475569;
+}
+
+.smartvari-panel-body {
+  padding: 0 22px 22px;
+}
+
+.smartvari-provider-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fffdf9, #f8fafc);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.smartvari-provider-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.smartvari-provider-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff;
+  font-weight: 800;
+}
+
+.smartvari-provider-details strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.smartvari-provider-details span,
+.smartvari-provider-details small {
+  color: #64748b;
+}
+
+.smartvari-toggle {
+  width: 52px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(148, 163, 184, 0.2);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.smartvari-toggle::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  transition: all 0.2s ease;
+}
+
+.smartvari-toggle.on {
+  background: linear-gradient(135deg, #34d399, #10b981);
+}
+
+.smartvari-toggle.on::after {
+  left: 25px;
+}
+
+.smartvari-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.smartvari-stat-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+}
+
+.smartvari-stat-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.75rem;
+  margin-bottom: 8px;
+}
+
+.smartvari-stat-card strong {
+  font-size: 1.45rem;
+  letter-spacing: -0.05em;
+}
+
+.smartvari-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.smartvari-form-row {
+  display: grid;
+  gap: 10px;
+}
+
+.smartvari-form-field {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.smartvari-form-field input,
+.smartvari-form-field select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.smartvari-empty-state {
+  padding: 26px 18px;
+  margin: 18px 0 0;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  text-align: center;
+  color: #475569;
+}
+
+.smartvari-empty-state h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+}
+
+.smartvari-request-list,
+.smartvari-delivery-list,
+.smartvari-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.smartvari-request-item,
+.smartvari-delivery-item,
+.smartvari-history-item {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.smartvari-request-item-top,
+.smartvari-delivery-item-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.smartvari-request-item strong,
+.smartvari-delivery-item strong,
+.smartvari-history-item strong {
+  display: block;
+  font-size: 0.96rem;
+}
+
+.smartvari-request-item small,
+.smartvari-delivery-item small,
+.smartvari-history-item small {
+  color: #64748b;
+}
+
+.smartvari-request-tags,
+.smartvari-delivery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.smartvari-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.08);
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.smartvari-tag.warning {
+  background: rgba(245, 158, 11, 0.08);
+  color: #b45309;
+}
+
+.smartvari-tag.success {
+  background: rgba(16, 185, 129, 0.08);
+  color: #047857;
+}
+
+.smartvari-tag.danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+}
+
+.smartvari-request-actions,
+.smartvari-delivery-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.smartvari-progress {
+  display: grid;
+  gap: 5px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff, #ffffff);
+}
+
+.smartvari-progress-step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  min-height: 25px;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.smartvari-progress-marker {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.smartvari-progress-step.complete,
+.smartvari-progress-step.current {
+  color: #0f766e;
+}
+
+.smartvari-progress-step.current .smartvari-progress-marker {
+  color: #0284c7;
+}
+
+.smartvari-progress-step i {
+  display: block;
+  width: 1px;
+  height: 8px;
+  margin-left: 10px;
+  background: #cbd5e1;
+  grid-column: 1;
+  grid-row: 1;
+  transform: translateY(17px);
+}
+
+.smartvari-micro-label {
+  color: #64748b;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.smartvari-inline-message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(249, 115, 22, 0.08);
+  color: #9a4d00;
+}
+
+@media (max-width: 980px) {
+  .smartvari-provider-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .smartvari-provider-shell {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .smartvari-provider-header,
+  .smartvari-panel-header,
+  .smartvari-panel-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .smartvari-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}

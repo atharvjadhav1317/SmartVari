@@ -1,37 +1,1266 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 
-const translations = {
-  en: { title: 'Dindi Leader Dashboard', brand: 'Wari Portal', dindiName: 'Dindi #104 · Tukaram Maharaj Palkhi', online: 'Online', offline: 'Offline mode · requests will be queued', welcome: 'Welcome, Dindi Leader', leaderId: 'Dindi ID: 104', language: 'मराठी', dashboard: 'Dashboard', overview: 'Dindi Overview', route: 'Route map', resources: 'Resource Requests', tickets: 'Active Tickets', groupSummary: 'Dindi group summary', groupNote: 'Live member information for your group', totalWarkaris: 'Total Warkaris', elderly: 'Elderly members', vulnerable: 'Medically vulnerable', quickSos: 'SEND EMERGENCY SOS', sosTitle: 'Emergency assistance', sosDescription: 'Send an urgent SOS with your Dindi details to the nearest response team.', resourceRequests: 'Request resources', resourceDescription: 'Tell the control room exactly what your Dindi needs.', waterLiters: 'Drinking water', foodMeals: 'Food packets', medicalKits: 'First-aid kits', submitRequest: 'Submit resource request', activeTickets: 'Active requests & tickets', ticketDescription: 'Follow up on the support currently assigned to your Dindi.', assigned: 'Assigned', pending: 'Pending', completed: 'Completed', sosConfirm: 'Trigger an emergency SOS for your Dindi?', sosSent: 'Emergency SOS sent. The nearest response team has been alerted.', requestSent: 'Resource request sent to the control room.', requestQueued: 'You are offline. This request was saved and will sync automatically.', water: 'Water', medical: 'Medical', resource: 'Resource request', routeTitle: 'Dindi route / line map', routeDescription: 'Track Dindi #104 across today’s Palkhi route.', liveLocation: 'Live location', nextStop: 'Next stop', eta: 'ETA', kmToGo: 'km to checkpoint', waterAvailable: 'Water available', medicalAvailable: 'Medical aid', limited: 'Limited', routeProgress: 'Route progress', checkpoints: [{ name: 'Start location', place: 'Alandi', distance: '0 km', water: 'Available', medical: 'Available', status: 'completed', icon: 'fa-flag-checkered' }, { name: 'Rest stop 1', place: 'Dudulgaon', distance: '4.8 km', water: 'Available', medical: 'Limited', status: 'completed', icon: 'fa-mug-hot' }, { name: 'Current location', place: 'Charholi', distance: '8.6 km', water: 'Available', medical: 'Available', status: 'current', icon: 'fa-location-crosshairs' }, { name: 'Lunch halt', place: 'Wagholi', distance: '12.1 km', water: 'Available', medical: 'Available', status: 'upcoming', icon: 'fa-utensils' }, { name: 'Night halt', place: 'Lonikand', distance: '19.4 km', water: 'Limited', medical: 'Available', status: 'upcoming', icon: 'fa-moon' }] },
-  mr: { title: 'दिंडी प्रमुख डॅशबोर्ड', brand: 'वारी पोर्टल', dindiName: 'दिंडी क्र. १०४ · तुकाराम महाराज पालखी', online: 'ऑनलाइन', offline: 'ऑफलाइन मोड · मागण्या जतन केल्या जातील', welcome: 'नमस्कार, दिंडी प्रमुख', leaderId: 'दिंडी क्रमांक: १०४', language: 'English', dashboard: 'डॅशबोर्ड', overview: 'दिंडी आढावा', route: 'मार्ग नकाशा', resources: 'साहित्य मागणी', tickets: 'सक्रिय तिकीट', groupSummary: 'दिंडी गटाचा आढावा', groupNote: 'तुमच्या गटाची अद्ययावत माहिती', totalWarkaris: 'एकूण वारकरी', elderly: 'वयोवृद्ध सदस्य', vulnerable: 'वैद्यकीयदृष्ट्या संवेदनशील', quickSos: 'तातडीचा एसओएस पाठवा', sosTitle: 'तातडीची मदत', sosDescription: 'तुमच्या दिंडीची माहिती जवळच्या आपत्कालीन पथकाला त्वरित पाठवा.', resourceRequests: 'साहित्य मागणी', resourceDescription: 'दिंडीला आवश्यक असलेले साहित्य नियंत्रण कक्षाला कळवा.', waterLiters: 'पिण्याचे पाणी', foodMeals: 'जेवणाची पाकिटे', medicalKits: 'प्रथमोपचार किट', submitRequest: 'साहित्य मागणी पाठवा', activeTickets: 'सक्रिय मागण्या व तिकीट', ticketDescription: 'तुमच्या दिंडीसाठी सुरू असलेल्या मदतीचा मागोवा घ्या.', assigned: 'नियुक्त', pending: 'प्रलंबित', completed: 'पूर्ण', sosConfirm: 'तुमच्या दिंडीसाठी तातडीचा एसओएस पाठवायचा आहे का?', sosSent: 'तातडीचा एसओएस पाठवला आहे. जवळच्या मदत पथकाला सूचना देण्यात आली आहे.', requestSent: 'साहित्य मागणी नियंत्रण कक्षाला पाठवली आहे.', requestQueued: 'तुम्ही ऑफलाइन आहात. ही मागणी जतन केली असून कनेक्ट झाल्यावर पाठवली जाईल.', water: 'पाणी', medical: 'वैद्यकीय मदत', resource: 'साहित्य मागणी', routeTitle: 'दिंडी मार्ग / लाईन नकाशा', routeDescription: 'आजच्या पालखी मार्गावर दिंडी क्र. १०४ चा मागोवा घ्या.', liveLocation: 'सध्याचे ठिकाण', nextStop: 'पुढील थांबा', eta: 'पोहोचण्याचा वेळ', kmToGo: 'किमी अंतर', waterAvailable: 'पाणी उपलब्ध', medicalAvailable: 'वैद्यकीय मदत', limited: 'मर्यादित', routeProgress: 'मार्गाची प्रगती', checkpoints: [{ name: 'प्रारंभ ठिकाण', place: 'आळंदी', distance: '० किमी', water: 'उपलब्ध', medical: 'उपलब्ध', status: 'completed', icon: 'fa-flag-checkered' }, { name: 'विश्रांती थांबा १', place: 'दुडुळगाव', distance: '४.८ किमी', water: 'उपलब्ध', medical: 'मर्यादित', status: 'completed', icon: 'fa-mug-hot' }, { name: 'सध्याचे ठिकाण', place: 'चऱ्होली', distance: '८.६ किमी', water: 'उपलब्ध', medical: 'उपलब्ध', status: 'current', icon: 'fa-location-crosshairs' }, { name: 'दुपारचा थांबा', place: 'वाघोली', distance: '१२.१ किमी', water: 'उपलब्ध', medical: 'उपलब्ध', status: 'upcoming', icon: 'fa-utensils' }, { name: 'रात्रीचा थांबा', place: 'लोणीकंद', distance: '१९.४ किमी', water: 'मर्यादित', medical: 'उपलब्य', status: 'upcoming', icon: 'fa-moon' }] },
+import { listWaris, createWari } from '../../features/live-wari/services/wari';
+import { getRouteByWariId, saveRoute } from '../../features/live-wari/services/routes';
+import { getWariHalts, createWariHalts } from '../../features/live-wari/services/halts';
+import {
+  createResourceRequest,
+  listLiveResourceRequests,
+  listResourceRequestHistory,
+  updateResourceRequestStatus,
+} from '../../features/live-wari/services/resourceRequests';
+import { fetchRoadRoute } from '../../features/live-wari/services/routing';
+
+const emptyRegistration = () => ({
+  wari_code: '',
+  name: '',
+  source: '',
+  destination: '',
+  start_date: '',
+  end_date: '',
+  organizer_name: '',
+  organizer_contact: '',
+  description: '',
+});
+
+const emptyHalt = () => ({
+  day_number: 1,
+  sequence_order: 1,
+  halt_name: '',
+  latitude: '',
+  longitude: '',
+  halt_type: 'REST',
+  arrival_time: '',
+  departure_time: '',
+  notes: '',
+});
+
+const statusTone = {
+  PENDING: 'warning',
+  IN_PROGRESS: 'info',
+  FULFILLED: 'success',
+  CANCELLED: 'danger',
 };
-const ticketSeed = [{ id: 'SR-1042', type: 'Water', quantity: '700 L', status: 'Assigned', assignedTo: 'Volunteer Team 4', time: '10:15 AM', icon: 'fa-droplet' }, { id: 'SR-1039', type: 'Medical', quantity: '2 First Aid Kits', status: 'Pending', assignedTo: 'AI matching in progress', time: '10:30 AM', icon: 'fa-kit-medical' }];
-const volunteers = [{ id: 'VOL-118', name: 'Sanjay Jadhav', distance: '0.4 km', eta: '5 min', skills: 'Water carrier', capacity: '300 L water', initials: 'SJ', colour: 'blue' }, { id: 'VOL-072', name: 'Meera Patil', distance: '0.8 km', eta: '9 min', skills: 'Food distribution', capacity: '180 meals', initials: 'MP', colour: 'amber' }, { id: 'VOL-203', name: 'Dr. Rohan Kulkarni', distance: '1.2 km', eta: '14 min', skills: 'First aid', capacity: 'Medical supplies', initials: 'RK', colour: 'rose' }];
+
+async function geocodePlace(query) {
+  const clean = String(query || '').trim();
+
+  if (!clean) {
+    throw new Error('Location name is required.');
+  }
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(clean)}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'en',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Unable to locate ${clean}.`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(`No map location found for ${clean}.`);
+  }
+
+  const first = data[0];
+
+  return {
+    lat: Number(first.lat),
+    lng: Number(first.lon),
+  };
+}
 
 export default function DindiLeaderDashboard() {
-  const [lang, setLang] = useState('mr'); const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine); const [waterReq, setWaterReq] = useState(700); const [foodReq, setFoodReq] = useState(350); const [medicalReq, setMedicalReq] = useState(5); const [tickets, setTickets] = useState(ticketSeed); const [message, setMessage] = useState(''); const [showNearbyVolunteers, setShowNearbyVolunteers] = useState(false); const [selectedCheckpoint, setSelectedCheckpoint] = useState(2); const [focusedCard, setFocusedCard] = useState('overview');
-  const overviewRef = useRef(null); const routeRef = useRef(null); const resourceRef = useRef(null); const ticketsRef = useRef(null); const t = translations[lang]; const selectedStop = t.checkpoints[selectedCheckpoint];
-  useEffect(() => { const online = () => setIsOnline(true); const offline = () => setIsOnline(false); window.addEventListener('online', online); window.addEventListener('offline', offline); return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offline); }; }, []);
-  useEffect(() => { if (!message) return undefined; const timer = window.setTimeout(() => setMessage(''), 4200); return () => window.clearTimeout(timer); }, [message]);
-  const scrollTo = (ref, id) => { setFocusedCard(id); ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }; const card = (id) => ({ onClick: () => setFocusedCard(id), className: focusedCard === id ? 'is-focused' : '' });
-  const showSos = () => { if (!window.confirm(t.sosConfirm)) return; setTickets((items) => [{ id: `EM-${Math.floor(1000 + Math.random() * 9000)}`, type: 'Emergency SOS', quantity: 'Immediate assistance needed', status: 'Assigned', assignedTo: 'Nearest rapid response unit', time: 'Just now', icon: 'fa-triangle-exclamation', emergency: true }, ...items]); setFocusedCard('tickets'); setMessage(t.sosSent); };
-  const submitRequest = (event) => { event.preventDefault(); setTickets((items) => [{ id: `SR-${Math.floor(1000 + Math.random() * 9000)}`, type: t.resource, quantity: `${waterReq} L water · ${foodReq} meals · ${medicalReq} kits`, status: 'Pending', assignedTo: 'AI matching in progress', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), icon: 'fa-box-open' }, ...items]); setShowNearbyVolunteers(true); setFocusedCard('resources'); setMessage(isOnline ? t.requestSent : t.requestQueued); };
-  const status = (value) => ({ Assigned: t.assigned, Pending: t.pending, Completed: t.completed }[value] || value); const type = (ticket) => ticket.type === 'Water' ? t.water : ticket.type === 'Medical' ? t.medical : ticket.type;
-  return <div className="leader-app"><DashboardStyles /><aside className="leader-sidebar" aria-label="Dashboard navigation"><button className="leader-brand" onClick={() => scrollTo(overviewRef, 'overview')}><i className="fa-solid fa-om" /><span>{t.brand}</span></button><nav className="leader-nav"><Nav active icon="fa-chart-line" text={t.dashboard} onClick={() => scrollTo(overviewRef, 'overview')} /><Nav icon="fa-people-group" text={t.overview} onClick={() => scrollTo(overviewRef, 'stats')} /><Nav icon="fa-route" text={t.route} onClick={() => scrollTo(routeRef, 'route')} /><Nav icon="fa-box-open" text={t.resources} onClick={() => scrollTo(resourceRef, 'resources')} /><Nav icon="fa-clipboard-list" text={t.tickets} onClick={() => scrollTo(ticketsRef, 'tickets')} /></nav><div className={`connection-badge ${isOnline ? 'is-online' : 'is-offline'}`}><span className="connection-dot" />{isOnline ? t.online : t.offline}</div></aside><div className="leader-main-wrapper"><header className="leader-header"><div><p className="leader-eyebrow">{t.brand}</p><h1>{t.title}</h1><p className="leader-dindi-name">{t.dindiName}</p></div><div className="leader-profile"><button className="header-sos-button" onClick={showSos}><i className="fa-solid fa-triangle-exclamation" />{t.quickSos}</button><button className="language-toggle" onClick={() => setLang(lang === 'mr' ? 'en' : 'mr')}><i className="fa-solid fa-language" /> {t.language}</button><div className="leader-user"><span className="leader-avatar"><i className="fa-solid fa-user" /></span><div><strong>{t.welcome}</strong><span>{t.leaderId}</span></div></div></div></header><main className="leader-dashboard-content">{message && <div className="leader-toast" role="status"><i className="fa-solid fa-circle-check" /> {message}</div>}
-    <section ref={overviewRef} {...card('overview')} className={`leader-hero-card leader-card section-anchor ${focusedCard === 'overview' ? 'is-focused' : ''}`}><div><p className="section-kicker">{t.overview}</p><h2>{t.groupSummary}</h2><p>{t.groupNote}</p></div><button className="hero-action" onClick={(e) => { e.stopPropagation(); scrollTo(routeRef, 'route'); }}>{t.route} <i className="fa-solid fa-arrow-right" /></button></section>
-    <section className="leader-overview-grid"><article {...card('stats')} className={`leader-card stats-card ${focusedCard === 'stats' ? 'is-focused' : ''}`}><div className="card-title-row"><h2><i className="fa-solid fa-people-group" /> {t.groupSummary}</h2><span className="live-label"><span /> {t.online}</span></div><div className="stat-grid"><Stat colour="primary" icon="fa-users" value="350" text={t.totalWarkaris} /><Stat colour="warm" icon="fa-person-cane" value="45" text={t.elderly} /><Stat colour="alert" icon="fa-heart-pulse" value="12" text={t.vulnerable} /></div></article><article {...card('emergency')} className={`leader-card emergency-card ${focusedCard === 'emergency' ? 'is-focused' : ''}`}><div className="card-title-row"><h2><i className="fa-solid fa-headset" /> {t.sosTitle}</h2></div><p>{t.sosDescription}</p><button className="emergency-button" onClick={(e) => { e.stopPropagation(); showSos(); }}><i className="fa-solid fa-triangle-exclamation" />{t.quickSos}</button></article></section>
-    <section ref={routeRef} {...card('route')} className={`leader-card route-card section-anchor ${focusedCard === 'route' ? 'is-focused' : ''}`}><div className="route-heading"><div><p className="section-kicker">{t.routeProgress}</p><h2><i className="fa-solid fa-route" /> {t.routeTitle}</h2><p>{t.routeDescription}</p></div><div className="route-eta"><span>{t.nextStop}</span><strong>Wagholi</strong><small><i className="fa-regular fa-clock" /> {t.eta}: 42 min</small></div></div><div className="route-map-layout"><div className="route-timeline"><div className="route-progress-track"><span /></div>{t.checkpoints.map((stop, index) => <button type="button" key={stop.name} className={`route-stop route-stop-${stop.status} ${selectedCheckpoint === index ? 'is-selected' : ''}`} onClick={(e) => { e.stopPropagation(); setSelectedCheckpoint(index); setFocusedCard('route'); }}><span className="route-marker"><i className={`fa-solid ${stop.icon}`} /></span><span className="route-stop-content"><strong>{stop.name}</strong><small>{stop.place} · {stop.distance}</small>{stop.status === 'current' && <em><i className="fa-solid fa-satellite-dish" /> {t.liveLocation}</em>}</span></button>)}</div><aside className="checkpoint-detail" aria-live="polite"><span className="checkpoint-detail-kicker"><i className="fa-solid fa-location-dot" /> {selectedStop.place}</span><h3>{selectedStop.name}</h3><p><strong>{selectedStop.distance}</strong> {t.kmToGo}</p><div className="checkpoint-services"><span><i className="fa-solid fa-droplet" /><small>{t.waterAvailable}</small><strong className={selectedStop.water === t.limited ? 'is-limited' : ''}>{selectedStop.water}</strong></span><span><i className="fa-solid fa-kit-medical" /><small>{t.medicalAvailable}</small><strong className={selectedStop.medical === t.limited ? 'is-limited' : ''}>{selectedStop.medical}</strong></span></div></aside></div></section>
-    <section ref={resourceRef} {...card('resources')} className={`leader-card resource-card section-anchor ${focusedCard === 'resources' ? 'is-focused' : ''}`}><div className="card-title-row resource-heading"><div><h2><i className="fa-solid fa-box-open" /> {t.resourceRequests}</h2><p>{t.resourceDescription}</p></div></div><form className="resource-form" onSubmit={submitRequest}><Resource icon="fa-droplet" text={t.waterLiters} unit="L" value={waterReq} increment={100} colour="blue" onChange={setWaterReq} /><Resource icon="fa-utensils" text={t.foodMeals} unit="meals" value={foodReq} increment={50} colour="amber" onChange={setFoodReq} /><Resource icon="fa-kit-medical" text={t.medicalKits} unit="kits" value={medicalReq} increment={1} colour="rose" onChange={setMedicalReq} /><button className="resource-submit"><i className="fa-solid fa-paper-plane" /> {t.submitRequest}</button></form>{showNearbyVolunteers && <section className="nearby-volunteers"><div className="nearby-volunteers-heading"><div><span className="nearby-kicker"><i className="fa-solid fa-location-dot" /> Matched for your latest request</span><h3>Nearby volunteers</h3><p>Available volunteers closest to your Dindi have been matched for this request.</p></div><span className="volunteer-count"><i className="fa-solid fa-users" /> 3 volunteers found nearby</span></div><div className="volunteer-list">{volunteers.map((v) => <article key={v.id} onClick={() => setFocusedCard(v.id)} className={`volunteer-card ${focusedCard === v.id ? 'is-focused' : ''}`}><span className={`volunteer-avatar volunteer-avatar-${v.colour}`}>{v.initials}</span><div className="volunteer-details"><div className="volunteer-name-row"><h4>{v.name}</h4><span className="volunteer-available"><i className="fa-solid fa-circle" /> Available now</span></div><p><i className="fa-solid fa-location-dot" /> {v.distance} away · <i className="fa-regular fa-clock" /> {v.eta}</p><div className="volunteer-meta"><span><i className="fa-solid fa-hand-holding-heart" /> {v.skills}</span><span><i className="fa-solid fa-box-open" /> Can bring: {v.capacity}</span></div></div><span className="volunteer-shared"><i className="fa-solid fa-paper-plane" /> Request shared</span></article>)}</div></section>}</section>
-    <section ref={ticketsRef} {...card('tickets')} className={`leader-card tickets-card section-anchor ${focusedCard === 'tickets' ? 'is-focused' : ''}`}><div className="card-title-row ticket-heading"><div><h2><i className="fa-solid fa-clipboard-list" /> {t.activeTickets}</h2><p>{t.ticketDescription}</p></div><span className="ticket-count">{tickets.length}</span></div><div className="ticket-list">{tickets.map((ticket) => <article key={ticket.id} onClick={() => setFocusedCard(ticket.id)} className={`ticket-item ${ticket.emergency ? 'ticket-emergency' : ''} ${focusedCard === ticket.id ? 'is-focused' : ''}`}><span className="ticket-icon"><i className={`fa-solid ${ticket.icon}`} /></span><div className="ticket-details"><div className="ticket-id-time"><strong>{ticket.id}</strong><span><i className="fa-regular fa-clock" /> {ticket.time}</span></div><h3>{type(ticket)}</h3><p>{ticket.quantity}</p><span className="ticket-assignee"><i className="fa-solid fa-user-group" /> {ticket.assignedTo}</span></div><span className={`ticket-status ticket-status-${ticket.status.toLowerCase()}`}>{status(ticket.status)}</span></article>)}</div></section>
-  </main></div></div>;
+  const [waris, setWaris] = useState([]);
+  const [selectedWariId, setSelectedWariId] = useState('');
+  const [selectedWari, setSelectedWari] = useState(null);
+  const [route, setRoute] = useState(null);
+  const [halts, setHalts] = useState([]);
+  const [liveRequests, setLiveRequests] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [haltsLoading, setHaltsLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerForm, setRegisterForm] = useState(emptyRegistration());
+  const [registerError, setRegisterError] = useState('');
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [haltDraft, setHaltDraft] = useState(emptyHalt());
+  const [haltError, setHaltError] = useState('');
+  const [haltLoading, setHaltLoading] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    FOOD: { quantity: '20', notes: '' },
+    WATER: { quantity: '50', notes: '' },
+  });
+  const [requestError, setRequestError] = useState('');
+  const [requestLoading, setRequestLoading] = useState({ FOOD: false, WATER: false });
+
+  const selectedWariName = selectedWari?.name || 'Selected Wari';
+
+  const loadDashboardData = async (wariId) => {
+    if (!wariId) {
+      setRoute(null);
+      setHalts([]);
+      setLiveRequests([]);
+      setHistory([]);
+      return;
+    }
+
+    setRouteLoading(true);
+    setHaltsLoading(true);
+
+    try {
+      const [routeRecord, haltRows, activeRows, historyRows] = await Promise.all([
+        getRouteByWariId(wariId),
+        getWariHalts(wariId),
+        listLiveResourceRequests(wariId),
+        listResourceRequestHistory(wariId),
+      ]);
+
+      setRoute(routeRecord);
+      setHalts(haltRows || []);
+      setLiveRequests(activeRows || []);
+      setHistory(historyRows || []);
+    } catch (loadError) {
+      console.error('Unable to load Dindi dashboard data', loadError);
+      setError(loadError?.message || 'Unable to load dashboard data.');
+    } finally {
+      setRouteLoading(false);
+      setHaltsLoading(false);
+    }
+  };
+
+  const loadWaris = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const rows = await listWaris();
+      setWaris(rows || []);
+
+      if (rows && rows.length > 0) {
+        const nextSelected = rows[0];
+        setSelectedWariId((previous) => previous || nextSelected.id);
+        setSelectedWari(nextSelected);
+      } else {
+        setSelectedWariId('');
+        setSelectedWari(null);
+      }
+    } catch (loadError) {
+      console.error('Unable to load Wari list', loadError);
+      setError(loadError?.message || 'Unable to load Wari list from Supabase.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWaris();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedWariId) {
+      setRoute(null);
+      setHalts([]);
+      setLiveRequests([]);
+      setHistory([]);
+      return;
+    }
+
+    const selected = waris.find((item) => item.id === selectedWariId) || null;
+    setSelectedWari(selected);
+    loadDashboardData(selectedWariId);
+  }, [selectedWariId, waris]);
+
+  const refreshAll = async () => {
+    await loadWaris();
+    if (selectedWariId) {
+      await loadDashboardData(selectedWariId);
+    }
+  };
+
+  const handleRegisterSubmit = async (event) => {
+    event.preventDefault();
+    setRegisterError('');
+    setRegisterLoading(true);
+
+    try {
+      const nextValues = {
+        wari_code: registerForm.wari_code.trim(),
+        name: registerForm.name.trim(),
+        source: registerForm.source.trim(),
+        destination: registerForm.destination.trim(),
+        start_date: registerForm.start_date || null,
+        end_date: registerForm.end_date || null,
+        organizer_name: registerForm.organizer_name.trim() || null,
+        organizer_contact: registerForm.organizer_contact.trim() || null,
+        description: registerForm.description.trim() || null,
+      };
+
+      if (!nextValues.wari_code || !nextValues.name || !nextValues.source || !nextValues.destination) {
+        setRegisterError('Wari code, name, source and destination are required.');
+        return;
+      }
+
+      const created = await createWari(nextValues);
+      const nextWaris = [created, ...waris];
+      setWaris(nextWaris);
+      setSelectedWariId(created.id);
+      setSelectedWari(created);
+      setRegisterForm(emptyRegistration());
+      setIsRegistering(false);
+      await loadDashboardData(created.id);
+    } catch (registerFailure) {
+      console.error('Wari creation failed', registerFailure);
+      setRegisterError(registerFailure?.message || 'Unable to create Wari.');
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleSaveRoute = async () => {
+    if (!selectedWariId || !selectedWari) {
+      return;
+    }
+
+    const sourceName = selectedWari.source?.trim();
+    const destinationName = selectedWari.destination?.trim();
+
+    if (!sourceName || !destinationName) {
+      setError('Add source and destination to the selected Wari before saving a route.');
+      return;
+    }
+
+    setRouteLoading(true);
+    setError('');
+
+    try {
+      const [sourcePoint, destinationPoint] = await Promise.all([
+        geocodePlace(sourceName),
+        geocodePlace(destinationName),
+      ]);
+
+      const routePoints = [
+        { lat: sourcePoint.lat, lng: sourcePoint.lng },
+        { lat: destinationPoint.lat, lng: destinationPoint.lng },
+      ];
+
+      const roadRoute = await fetchRoadRoute(routePoints);
+
+      const saved = await saveRoute({
+        wari_id: selectedWariId,
+        route_points: routePoints,
+        checkpoints: [
+          { name: sourceName, lat: sourcePoint.lat, lng: sourcePoint.lng },
+          { name: destinationName, lat: destinationPoint.lat, lng: destinationPoint.lng },
+        ],
+        source_lat: sourcePoint.lat,
+        source_lng: sourcePoint.lng,
+        destination_lat: destinationPoint.lat,
+        destination_lng: destinationPoint.lng,
+        road_geometry: roadRoute.geometry,
+        total_distance_km: Number((roadRoute.distance / 1000).toFixed(2)),
+        estimated_duration_min: Math.round(roadRoute.duration / 60),
+      });
+
+      setRoute(saved);
+    } catch (routeFailure) {
+      console.error('Route save failed', routeFailure);
+      setError(routeFailure?.message || 'Unable to save route.');
+    } finally {
+      setRouteLoading(false);
+    }
+  };
+
+  const handleAddHalt = async (event) => {
+    event.preventDefault();
+
+    if (!selectedWariId) {
+      setHaltError('Select or register a Wari before adding a halt.');
+      return;
+    }
+
+    const trimmedName = haltDraft.halt_name.trim();
+    const latitude = Number(haltDraft.latitude);
+    const longitude = Number(haltDraft.longitude);
+
+    if (!trimmedName || Number.isNaN(latitude) || Number.isNaN(longitude)) {
+      setHaltError('Halt name, latitude and longitude are required.');
+      return;
+    }
+
+    setHaltLoading(true);
+    setHaltError('');
+
+    try {
+      const payload = {
+        wari_id: selectedWariId,
+        day_number: Number(haltDraft.day_number) || 1,
+        sequence_order: Number(haltDraft.sequence_order) || 1,
+        halt_name: trimmedName,
+        latitude,
+        longitude,
+        halt_type: haltDraft.halt_type || 'OTHER',
+        arrival_time: haltDraft.arrival_time || null,
+        departure_time: haltDraft.departure_time || null,
+        notes: haltDraft.notes.trim() || null,
+      };
+
+      const created = await createWariHalts([payload]);
+      const nextHalts = [...halts, ...(created || [])];
+      setHalts(nextHalts);
+      setHaltDraft(emptyHalt());
+    } catch (haltFailure) {
+      console.error('Unable to create halt', haltFailure);
+      setHaltError(haltFailure?.message || 'Unable to save halt.');
+    } finally {
+      setHaltLoading(false);
+    }
+  };
+
+  const handleRequestSubmit = async (resourceType) => {
+    if (!selectedWariId) {
+      setRequestError('Choose a Wari before submitting a request.');
+      return;
+    }
+
+    const quantity = Number(requestForm[resourceType].quantity || 0);
+    const notes = requestForm[resourceType].notes?.trim() || '';
+
+    if (!quantity || quantity <= 0) {
+      setRequestError(`${resourceType} quantity must be greater than zero.`);
+      return;
+    }
+
+    setRequestLoading((current) => ({ ...current, [resourceType]: true }));
+    setRequestError('');
+
+    try {
+      await createResourceRequest({
+        wari_id: selectedWariId,
+        halt_id: halts[0]?.id || null,
+        resource_type: resourceType,
+        quantity,
+        unit: resourceType === 'FOOD' ? 'meals' : 'litres',
+        notes,
+        status: 'PENDING',
+      });
+
+      setRequestForm((current) => ({
+        ...current,
+        [resourceType]: { quantity: resourceType === 'FOOD' ? '20' : '50', notes: '' },
+      }));
+
+      const [activeRows, historyRows] = await Promise.all([
+        listLiveResourceRequests(selectedWariId),
+        listResourceRequestHistory(selectedWariId),
+      ]);
+
+      setLiveRequests(activeRows || []);
+      setHistory(historyRows || []);
+    } catch (requestFailure) {
+      console.error('Request submission failed', requestFailure);
+      setRequestError(requestFailure?.message || 'Unable to create resource request.');
+    } finally {
+      setRequestLoading((current) => ({ ...current, [resourceType]: false }));
+    }
+  };
+
+  const handleFulfillRequest = async (requestId) => {
+    try {
+      await updateResourceRequestStatus(requestId, 'FULFILLED');
+      await loadDashboardData(selectedWariId);
+    } catch (issue) {
+      console.error('Unable to fulfill request', issue);
+      setError(issue?.message || 'Unable to update request status.');
+    }
+  };
+
+  const routeDistanceText = useMemo(() => {
+    if (!route || route.total_distance_km == null) {
+      return 'No route yet';
+    }
+
+    return `${Number(route.total_distance_km).toFixed(1)} km`;
+  }, [route]);
+
+  const routeTimeText = useMemo(() => {
+    if (!route || route.estimated_duration_min == null) {
+      return 'No ETA';
+    }
+
+    return `${route.estimated_duration_min} min`;
+  }, [route]);
+
+  if (loading) {
+    return (
+      <div className="dindi-shell">
+        <div className="dindi-loading">Loading Wari data…</div>
+      </div>
+    );
+  }
+
+  if (!waris.length) {
+    return (
+      <div className="dindi-shell">
+        <style>{styles}</style>
+        <div className="dindi-empty">
+          <div className="dindi-empty-card">
+            <h2>No Wari registered</h2>
+            <button type="button" className="primary-button" onClick={() => setIsRegistering(true)}>
+              Register Wari
+            </button>
+          </div>
+        </div>
+
+        {isRegistering ? (
+          <div className="dindi-modal-backdrop" onClick={() => setIsRegistering(false)}>
+            <div className="dindi-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Register Wari</h3>
+                <button type="button" className="ghost-button" onClick={() => setIsRegistering(false)}>
+                  Close
+                </button>
+              </div>
+
+              <form onSubmit={handleRegisterSubmit} className="forms-grid">
+                <label>
+                  <span>Wari ID / Code</span>
+                  <input value={registerForm.wari_code} onChange={(event) => setRegisterForm((current) => ({ ...current, wari_code: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Wari Name</span>
+                  <input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Source</span>
+                  <input value={registerForm.source} onChange={(event) => setRegisterForm((current) => ({ ...current, source: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Destination</span>
+                  <input value={registerForm.destination} onChange={(event) => setRegisterForm((current) => ({ ...current, destination: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Start Date</span>
+                  <input type="date" value={registerForm.start_date} onChange={(event) => setRegisterForm((current) => ({ ...current, start_date: event.target.value }))} />
+                </label>
+                <label>
+                  <span>End Date</span>
+                  <input type="date" value={registerForm.end_date} onChange={(event) => setRegisterForm((current) => ({ ...current, end_date: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Organizer / Leader Name</span>
+                  <input value={registerForm.organizer_name} onChange={(event) => setRegisterForm((current) => ({ ...current, organizer_name: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Organizer Contact</span>
+                  <input value={registerForm.organizer_contact} onChange={(event) => setRegisterForm((current) => ({ ...current, organizer_contact: event.target.value }))} />
+                </label>
+                <label className="full-span">
+                  <span>Description</span>
+                  <textarea value={registerForm.description} onChange={(event) => setRegisterForm((current) => ({ ...current, description: event.target.value }))} rows={4} />
+                </label>
+
+                {registerError ? <div className="inline-error full-span">{registerError}</div> : null}
+
+                <button className="primary-button full-span" type="submit" disabled={registerLoading}>
+                  {registerLoading ? 'Creating Wari...' : 'Create Wari'}
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="dindi-shell">
+      <style>{styles}</style>
+
+      <aside className="dindi-sidebar">
+        <div className="brand-row">
+          <div className="brand-mark">SW</div>
+          <div>
+            <small>SmartVari</small>
+            <strong>Dindi</strong>
+          </div>
+        </div>
+
+        <div className="section-label">Wari</div>
+        <select
+          value={selectedWariId}
+          onChange={(event) => setSelectedWariId(event.target.value)}
+          className="select-control"
+        >
+          {waris.map((wari) => (
+            <option key={wari.id} value={wari.id}>
+              {wari.name || wari.wari_code || 'Unnamed Wari'}
+            </option>
+          ))}
+        </select>
+
+        <button type="button" className="ghost-button full-width" onClick={() => setIsRegistering(true)}>
+          Register Wari
+        </button>
+      </aside>
+
+      <main className="dindi-main">
+        {error ? <div className="inline-error">{error}</div> : null}
+
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">Dindi Leader</p>
+            <h1>{selectedWariName}</h1>
+          </div>
+          <button type="button" className="primary-button" onClick={refreshAll}>
+            Refresh
+          </button>
+        </header>
+
+        <section className="overview-grid">
+          <article className="card large-card">
+            <label>WARI</label>
+            <div className="metric-row">
+              <strong>{selectedWari?.wari_code || '—'}</strong>
+              <span>{selectedWari?.source || 'Unknown'} → {selectedWari?.destination || 'Unknown'}</span>
+            </div>
+          </article>
+
+          <article className="card large-card">
+            <label>ROUTE</label>
+            <div className="metric-row">
+              <strong>{routeDistanceText}</strong>
+              <span>{routeTimeText}</span>
+            </div>
+            <button className="small-button" type="button" onClick={handleSaveRoute} disabled={routeLoading}>
+              {routeLoading ? 'Saving route…' : 'Save route'}
+            </button>
+          </article>
+
+          <article className="card large-card">
+            <label>TODAY’S HALTS</label>
+            <div className="metric-row">
+              <strong>{halts.length}</strong>
+              <span>{halts.length ? 'planned stops' : 'no halts yet'}</span>
+            </div>
+          </article>
+        </section>
+
+        <section className="content-grid">
+          <div className="stack-column">
+            <article className="card form-card">
+              <div className="card-head">
+                <h3>Route</h3>
+              </div>
+              <div className="route-summary">
+                <span>{selectedWari?.source || 'Source'}</span>
+                <span className="divider">→</span>
+                <span>{selectedWari?.destination || 'Destination'}</span>
+              </div>
+            </article>
+
+            <article className="card form-card">
+              <div className="card-head">
+                <h3>Today’s halts</h3>
+              </div>
+
+              <form onSubmit={handleAddHalt} className="forms-grid compact-grid">
+                <label>
+                  <span>Day</span>
+                  <input type="number" min="1" value={haltDraft.day_number} onChange={(event) => setHaltDraft((current) => ({ ...current, day_number: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Sequence</span>
+                  <input type="number" min="1" value={haltDraft.sequence_order} onChange={(event) => setHaltDraft((current) => ({ ...current, sequence_order: event.target.value }))} />
+                </label>
+                <label className="full-span">
+                  <span>Halt name</span>
+                  <input value={haltDraft.halt_name} onChange={(event) => setHaltDraft((current) => ({ ...current, halt_name: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Latitude</span>
+                  <input type="number" step="0.000001" value={haltDraft.latitude} onChange={(event) => setHaltDraft((current) => ({ ...current, latitude: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Longitude</span>
+                  <input type="number" step="0.000001" value={haltDraft.longitude} onChange={(event) => setHaltDraft((current) => ({ ...current, longitude: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select value={haltDraft.halt_type} onChange={(event) => setHaltDraft((current) => ({ ...current, halt_type: event.target.value }))}>
+                    {['START', 'REST', 'FOOD', 'WATER', 'MEDICAL', 'LUNCH', 'NIGHT', 'DESTINATION', 'OTHER'].map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Arrival</span>
+                  <input type="time" value={haltDraft.arrival_time} onChange={(event) => setHaltDraft((current) => ({ ...current, arrival_time: event.target.value }))} />
+                </label>
+                <label>
+                  <span>Departure</span>
+                  <input type="time" value={haltDraft.departure_time} onChange={(event) => setHaltDraft((current) => ({ ...current, departure_time: event.target.value }))} />
+                </label>
+                <label className="full-span">
+                  <span>Notes</span>
+                  <textarea rows={3} value={haltDraft.notes} onChange={(event) => setHaltDraft((current) => ({ ...current, notes: event.target.value }))} />
+                </label>
+
+                {haltError ? <div className="inline-error full-span">{haltError}</div> : null}
+
+                <button className="primary-button full-span" type="submit" disabled={haltLoading}>
+                  {haltLoading ? 'Saving halt…' : 'Add halt'}
+                </button>
+              </form>
+
+              <div className="list-box">
+                {haltsLoading ? <div className="muted">Loading halts…</div> : null}
+                {!haltsLoading && halts.length === 0 ? <div className="muted">No halts saved yet.</div> : null}
+
+                {halts.map((halt) => (
+                  <div key={halt.id} className="list-item compact-item">
+                    <div>
+                      <strong>{halt.halt_name}</strong>
+                      <span>{halt.halt_type}</span>
+                    </div>
+                    <small>Day {halt.day_number} · #{halt.sequence_order}</small>
+                    <small>{halt.latitude}, {halt.longitude}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <div className="stack-column">
+            <article className="card form-card">
+              <div className="card-head">
+                <h3>Food</h3>
+              </div>
+              <div className="request-row">
+                <input
+                  type="number"
+                  min="1"
+                  value={requestForm.FOOD.quantity}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, FOOD: { ...current.FOOD, quantity: event.target.value } }))}
+                />
+                <textarea
+                  rows={2}
+                  value={requestForm.FOOD.notes}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, FOOD: { ...current.FOOD, notes: event.target.value } }))}
+                  placeholder="Notes"
+                />
+                <button type="button" className="primary-button" onClick={() => handleRequestSubmit('FOOD')} disabled={requestLoading.FOOD}>
+                  {requestLoading.FOOD ? 'Sending…' : 'REQUEST FOOD'}
+                </button>
+              </div>
+            </article>
+
+            <article className="card form-card">
+              <div className="card-head">
+                <h3>Water</h3>
+              </div>
+              <div className="request-row">
+                <input
+                  type="number"
+                  min="1"
+                  value={requestForm.WATER.quantity}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, WATER: { ...current.WATER, quantity: event.target.value } }))}
+                />
+                <textarea
+                  rows={2}
+                  value={requestForm.WATER.notes}
+                  onChange={(event) => setRequestForm((current) => ({ ...current, WATER: { ...current.WATER, notes: event.target.value } }))}
+                  placeholder="Notes"
+                />
+                <button type="button" className="primary-button" onClick={() => handleRequestSubmit('WATER')} disabled={requestLoading.WATER}>
+                  {requestLoading.WATER ? 'Sending…' : 'REQUEST WATER'}
+                </button>
+              </div>
+            </article>
+
+            <article className="card list-card">
+              <div className="card-head">
+                <h3>Live requests</h3>
+              </div>
+              {liveRequests.length === 0 ? <div className="muted">No live requests.</div> : null}
+              {liveRequests.map((request) => (
+                <div key={request.id} className="list-item request-item">
+                  <div>
+                    <strong>{request.resource_type}</strong>
+                    <span>{request.quantity} {request.unit}</span>
+                  </div>
+                  <div className={`status-badge status-${statusTone[request.status] || 'info'}`}>{request.status}</div>
+                  <button type="button" className="small-button" onClick={() => handleFulfillRequest(request.id)}>
+                    Fulfill
+                  </button>
+                </div>
+              ))}
+            </article>
+
+            <article className="card list-card">
+              <div className="card-head">
+                <h3>History</h3>
+              </div>
+              {history.length === 0 ? <div className="muted">No fulfilled or cancelled requests.</div> : null}
+              {history.map((request) => (
+                <div key={request.id} className="list-item request-item">
+                  <div>
+                    <strong>{request.resource_type}</strong>
+                    <span>{request.quantity} {request.unit}</span>
+                  </div>
+                  <div className={`status-badge status-${statusTone[request.status] || 'info'}`}>{request.status}</div>
+                </div>
+              ))}
+            </article>
+          </div>
+        </section>
+      </main>
+
+      {isRegistering ? (
+        <div className="dindi-modal-backdrop" onClick={() => setIsRegistering(false)}>
+          <div className="dindi-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Register Wari</h3>
+              <button type="button" className="ghost-button" onClick={() => setIsRegistering(false)}>
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleRegisterSubmit} className="forms-grid">
+              <label>
+                <span>Wari ID / Code</span>
+                <input value={registerForm.wari_code} onChange={(event) => setRegisterForm((current) => ({ ...current, wari_code: event.target.value }))} />
+              </label>
+              <label>
+                <span>Wari Name</span>
+                <input value={registerForm.name} onChange={(event) => setRegisterForm((current) => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label>
+                <span>Source</span>
+                <input value={registerForm.source} onChange={(event) => setRegisterForm((current) => ({ ...current, source: event.target.value }))} />
+              </label>
+              <label>
+                <span>Destination</span>
+                <input value={registerForm.destination} onChange={(event) => setRegisterForm((current) => ({ ...current, destination: event.target.value }))} />
+              </label>
+              <label>
+                <span>Start Date</span>
+                <input type="date" value={registerForm.start_date} onChange={(event) => setRegisterForm((current) => ({ ...current, start_date: event.target.value }))} />
+              </label>
+              <label>
+                <span>End Date</span>
+                <input type="date" value={registerForm.end_date} onChange={(event) => setRegisterForm((current) => ({ ...current, end_date: event.target.value }))} />
+              </label>
+              <label>
+                <span>Organizer / Leader Name</span>
+                <input value={registerForm.organizer_name} onChange={(event) => setRegisterForm((current) => ({ ...current, organizer_name: event.target.value }))} />
+              </label>
+              <label>
+                <span>Organizer Contact</span>
+                <input value={registerForm.organizer_contact} onChange={(event) => setRegisterForm((current) => ({ ...current, organizer_contact: event.target.value }))} />
+              </label>
+              <label className="full-span">
+                <span>Description</span>
+                <textarea rows={4} value={registerForm.description} onChange={(event) => setRegisterForm((current) => ({ ...current, description: event.target.value }))} />
+              </label>
+
+              {registerError ? <div className="inline-error full-span">{registerError}</div> : null}
+
+              <button className="primary-button full-span" type="submit" disabled={registerLoading}>
+                {registerLoading ? 'Creating Wari...' : 'Create Wari'}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {requestError ? <div className="toast-error">{requestError}</div> : null}
+    </div>
+  );
 }
-function Nav({ active, icon, text, onClick }) { return <button className={`leader-nav-link ${active ? 'leader-nav-link-active' : ''}`} onClick={onClick}><i className={`fa-solid ${icon}`} /> {text}</button>; }
-function Stat({ colour, icon, value, text }) { return <div className={`stat-item stat-${colour}`}><span className="stat-icon"><i className={`fa-solid ${icon}`} /></span><strong>{value}</strong><span>{text}</span></div>; }
-function Resource({ icon, text, unit, value, increment, colour, onChange }) { return <label className={`resource-field resource-field-${colour}`}><span className="resource-label"><i className={`fa-solid ${icon}`} /> {text}</span><span className="resource-input-row"><input type="number" min="0" value={value} onClick={(e) => e.stopPropagation()} onChange={(e) => onChange(Number(e.target.value))} /><span className="resource-unit">{unit}</span><button type="button" onClick={() => onChange((current) => current + increment)}>+{increment}</button></span></label>; }
-function DashboardStyles() { return <style>{`
-  .leader-app{--slate:#0f172a;--surface:rgba(30,41,59,.8);--line:rgba(148,163,184,.16);--text:#f8fafc;--muted:#94a3b8;--blue:#3b82f6;--emerald:#10b981;--amber:#f59e0b;--red:#ef4444;min-height:100vh;display:flex;color:var(--text);background:radial-gradient(circle at 84% -10%,rgba(59,130,246,.28),transparent 31%),radial-gradient(circle at 18% 80%,rgba(16,185,129,.13),transparent 25%),var(--slate);font-family:Inter,ui-sans-serif,system-ui,sans-serif}.leader-app *{box-sizing:border-box}.leader-app button,.leader-app input{font:inherit}.leader-app button{cursor:pointer}.leader-sidebar{position:sticky;top:0;width:248px;height:100vh;flex:none;display:flex;flex-direction:column;gap:34px;padding:28px 18px;border-right:1px solid var(--line);background:rgba(15,23,42,.9);backdrop-filter:blur(18px)}.leader-brand,.leader-nav-link{border:0;color:var(--muted);background:transparent;text-align:left;transition:.2s ease}.leader-brand{display:flex;align-items:center;gap:10px;padding:8px;color:#fff;font-size:18px;font-weight:800}.leader-brand i{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;color:#071b16;background:linear-gradient(135deg,#34d399,#10b981);box-shadow:0 0 22px rgba(16,185,129,.42)}.leader-nav{display:grid;gap:8px}.leader-nav-link{border-radius:10px;padding:13px 14px;font-weight:650}.leader-nav-link i{width:23px;color:#60a5fa}.leader-nav-link:hover,.leader-nav-link-active{color:#fff;background:rgba(59,130,246,.15);box-shadow:inset 3px 0 0 var(--blue)}.connection-badge{margin-top:auto;display:flex;align-items:center;gap:8px;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:12px;font-weight:700;background:rgba(30,41,59,.55)}.connection-dot{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 12px var(--emerald)}.is-offline .connection-dot{background:var(--amber);box-shadow:0 0 12px var(--amber)}
-  .leader-main-wrapper{min-width:0;flex:1}.leader-header{position:sticky;z-index:5;top:0;display:flex;justify-content:space-between;gap:24px;padding:23px clamp(20px,4vw,55px);border-bottom:1px solid var(--line);background:rgba(15,23,42,.72);backdrop-filter:blur(12px)}.leader-eyebrow,.section-kicker{margin:0 0 5px;color:#60a5fa;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.leader-header h1,.leader-header p{margin:0}.leader-header h1{font-size:clamp(22px,3vw,31px);letter-spacing:-.04em}.leader-dindi-name{margin-top:5px!important;color:var(--muted);font-size:13px}.leader-profile{display:flex;align-items:center;gap:11px}.leader-profile button,.resource-submit,.emergency-button,.hero-action{border:0;color:#fff;font-weight:800;transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}.header-sos-button,.emergency-button{background:linear-gradient(135deg,#f87171,var(--red));box-shadow:0 10px 25px rgba(239,68,68,.28)}.header-sos-button{padding:11px 14px;border-radius:10px;font-size:12px}.header-sos-button i,.emergency-button i{margin-right:7px}.language-toggle{padding:10px 12px;border:1px solid var(--line)!important;border-radius:10px;color:#dbeafe!important;background:rgba(30,41,59,.62)}.leader-user{display:flex;align-items:center;gap:9px;font-size:12px}.leader-user strong,.leader-user span{display:block}.leader-user span{color:var(--muted);margin-top:2px}.leader-avatar{display:grid!important;place-items:center;width:37px;height:37px;border-radius:50%;color:#dbeafe!important;background:linear-gradient(135deg,#2563eb,#06b6d4)}.leader-dashboard-content{max-width:1440px;margin:auto;padding:30px clamp(20px,4vw,55px) 55px}.leader-toast{position:fixed;z-index:9;right:26px;bottom:26px;max-width:390px;padding:14px 18px;border:1px solid rgba(52,211,153,.45);border-radius:12px;color:#d1fae5;background:rgba(6,78,59,.9);box-shadow:0 15px 35px rgba(0,0,0,.35);backdrop-filter:blur(12px);animation:slide-in .3s ease-out}.leader-toast i{color:#34d399}
-  .leader-card{border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:0 12px 32px rgba(2,6,23,.2);backdrop-filter:blur(12px);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}.leader-card:hover,.ticket-item:hover,.volunteer-card:hover{transform:translateY(-3px);border-color:rgba(96,165,250,.45)}.leader-card.is-focused,.ticket-item.is-focused,.volunteer-card.is-focused{border-color:var(--blue);box-shadow:0 0 24px -2px rgba(59,130,246,.45),0 18px 38px rgba(2,6,23,.42)}.leader-hero-card{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:28px 30px;margin-bottom:20px;overflow:hidden;background:linear-gradient(115deg,rgba(30,41,59,.93),rgba(30,58,93,.82))}.leader-hero-card h2,.leader-hero-card p{margin:0}.leader-hero-card h2{font-size:24px}.leader-hero-card>div>p:last-child{margin-top:7px;color:var(--muted)}.hero-action{padding:12px 15px;border-radius:10px;color:#07213f!important;white-space:nowrap;background:linear-gradient(135deg,#67e8f9,#3b82f6);box-shadow:0 8px 22px rgba(59,130,246,.25)}.leader-overview-grid{display:grid;grid-template-columns:1.35fr .85fr;gap:20px;margin-bottom:20px}.stats-card,.emergency-card,.route-card,.resource-card,.tickets-card{padding:25px}.card-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}.card-title-row h2,.route-heading h2{margin:0;font-size:18px}.card-title-row h2 i,.route-heading h2 i{color:#60a5fa}.live-label{display:flex;align-items:center;gap:6px;color:#6ee7b7;font-size:11px;font-weight:800}.live-label span{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 11px var(--emerald);animation:pulse 1.8s infinite}.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:23px}.stat-item{display:grid;gap:7px;padding:15px;border-radius:13px;background:rgba(15,23,42,.55)}.stat-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:9px}.stat-item strong{font-size:26px}.stat-item>span:last-child{color:var(--muted);font-size:12px}.stat-primary .stat-icon{color:#93c5fd;background:rgba(59,130,246,.18)}.stat-warm .stat-icon{color:#fcd34d;background:rgba(245,158,11,.16)}.stat-alert .stat-icon{color:#fda4af;background:rgba(239,68,68,.15)}.emergency-card{background:linear-gradient(135deg,rgba(69,10,10,.75),rgba(30,41,59,.85))}.emergency-card h2 i{color:#f87171}.emergency-card p{min-height:47px;color:#fecaca;font-size:14px;line-height:1.5}.emergency-button{width:100%;padding:13px;border-radius:10px}
-  .route-card,.resource-card{margin-bottom:20px}.route-heading{display:flex;justify-content:space-between;gap:22px}.route-heading p{margin:7px 0 0;color:var(--muted);font-size:13px}.route-eta{min-width:148px;padding:13px 15px;border:1px solid rgba(59,130,246,.28);border-radius:12px;color:#bfdbfe;background:rgba(30,58,138,.18)}.route-eta span,.route-eta small{display:block;font-size:11px}.route-eta strong{display:block;padding:3px 0;color:#fff}.route-map-layout{display:grid;grid-template-columns:1.5fr .8fr;gap:22px;margin-top:27px}.route-timeline{position:relative;display:grid;gap:7px}.route-progress-track{position:absolute;top:19px;bottom:19px;left:19px;width:3px;overflow:hidden;border-radius:4px;background:#334155}.route-progress-track span{display:block;width:100%;height:51%;border-radius:inherit;background:linear-gradient(var(--emerald),#22d3ee);box-shadow:0 0 12px #22d3ee}.route-stop{position:relative;z-index:1;display:flex;align-items:center;gap:13px;width:100%;padding:9px;border:1px solid transparent;border-radius:12px;color:#fff;text-align:left;background:transparent;transition:.2s ease}.route-stop:hover,.route-stop.is-selected{background:rgba(59,130,246,.13);border-color:rgba(96,165,250,.52);box-shadow:0 0 18px -4px rgba(59,130,246,.6)}.route-marker{display:grid;place-items:center;width:22px;height:22px;flex:none;border:3px solid #64748b;border-radius:50%;color:#0f172a;background:#cbd5e1;font-size:8px}.route-stop-completed .route-marker{border-color:#6ee7b7;background:var(--emerald)}.route-stop-current .route-marker{border-color:#bae6fd;color:#fff;background:var(--blue);box-shadow:0 0 0 7px rgba(59,130,246,.18),0 0 18px var(--blue);animation:pulse 1.8s infinite}.route-stop-content{display:grid;gap:3px}.route-stop-content strong{font-size:13px}.route-stop-content small{color:var(--muted)}.route-stop-content em{color:#67e8f9;font-size:10px;font-style:normal;font-weight:800}.checkpoint-detail{padding:21px;border:1px solid rgba(59,130,246,.3);border-radius:14px;background:linear-gradient(150deg,rgba(30,58,138,.22),rgba(15,23,42,.58))}.checkpoint-detail-kicker{color:#67e8f9;font-size:12px;font-weight:800}.checkpoint-detail h3{margin:10px 0 5px}.checkpoint-detail p{margin:0;color:var(--muted);font-size:12px}.checkpoint-detail p strong{color:#fff;font-size:18px}.checkpoint-services{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.checkpoint-services>span{display:grid;gap:5px;padding:10px;border-radius:9px;background:rgba(15,23,42,.52)}.checkpoint-services i{color:#60a5fa}.checkpoint-services small{color:var(--muted);font-size:10px}.checkpoint-services strong{color:#6ee7b7;font-size:12px}.checkpoint-services .is-limited{color:#fbbf24}
-  .resource-heading p,.ticket-heading p{margin:7px 0 0;color:var(--muted);font-size:13px}.resource-form{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:13px;margin-top:22px;align-items:end}.resource-field{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(15,23,42,.46)}.resource-label{font-size:12px;font-weight:700}.resource-label i{margin-right:4px}.resource-field-blue .resource-label i{color:#60a5fa}.resource-field-amber .resource-label i{color:#fbbf24}.resource-field-rose .resource-label i{color:#fb7185}.resource-input-row{display:flex;align-items:center;gap:7px}.resource-input-row input{width:100%;min-width:0;border:0;outline:0;color:#fff;background:transparent;font-size:18px;font-weight:800}.resource-unit{color:var(--muted);font-size:11px}.resource-input-row button{padding:4px 7px;border:1px solid rgba(96,165,250,.4);border-radius:6px;color:#bfdbfe;background:rgba(59,130,246,.15);font-size:11px;font-weight:800}.resource-submit{min-height:76px;padding:0 17px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#06b6d4);box-shadow:0 10px 22px rgba(37,99,235,.23)}.nearby-volunteers{margin-top:24px;padding-top:22px;border-top:1px solid var(--line)}.nearby-volunteers-heading{display:flex;justify-content:space-between;gap:15px}.nearby-kicker{color:#67e8f9;font-size:11px;font-weight:800}.nearby-volunteers h3{margin:7px 0 3px}.nearby-volunteers p{margin:0;color:var(--muted);font-size:12px}.volunteer-count,.ticket-count{align-self:start;padding:7px 10px;border-radius:999px;color:#a7f3d0;background:rgba(16,185,129,.13);font-size:11px;font-weight:800;white-space:nowrap}.volunteer-list,.ticket-list{display:grid;gap:10px;margin-top:16px}.volunteer-card,.ticket-item{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:13px;background:rgba(15,23,42,.48);transition:.22s ease;cursor:pointer}.volunteer-avatar{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:11px;color:#dbeafe;font-size:12px;font-weight:900}.volunteer-avatar-blue{background:linear-gradient(135deg,#1d4ed8,#06b6d4)}.volunteer-avatar-amber{background:linear-gradient(135deg,#d97706,#f59e0b)}.volunteer-avatar-rose{background:linear-gradient(135deg,#be123c,#f43f5e)}.volunteer-details{flex:1;min-width:0}.volunteer-name-row,.ticket-id-time{display:flex;align-items:center;justify-content:space-between;gap:10px}.volunteer-name-row h4,.ticket-details h3{margin:0;font-size:14px}.volunteer-available{color:#6ee7b7;font-size:10px;font-weight:800}.volunteer-available i{font-size:7px}.volunteer-details p{margin:4px 0;color:var(--muted);font-size:12px}.volunteer-meta{display:flex;flex-wrap:wrap;gap:8px;color:#bfdbfe;font-size:10px}.volunteer-shared{color:#67e8f9;font-size:11px;font-weight:800;white-space:nowrap}.ticket-count{display:grid;place-items:center;min-width:28px;min-height:28px;color:#bfdbfe;background:rgba(59,130,246,.16)}.ticket-icon{display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:11px;color:#93c5fd;background:rgba(59,130,246,.14)}.ticket-emergency{border-color:rgba(239,68,68,.4);background:linear-gradient(90deg,rgba(127,29,29,.22),rgba(15,23,42,.48))}.ticket-emergency .ticket-icon{color:#fca5a5;background:rgba(239,68,68,.18)}.ticket-details{flex:1}.ticket-id-time strong{color:#93c5fd;font-size:11px}.ticket-id-time span,.ticket-details p,.ticket-assignee{color:var(--muted);font-size:11px}.ticket-details p{margin:3px 0}.ticket-status{padding:6px 9px;border-radius:999px;font-size:10px;font-weight:900}.ticket-status-assigned{color:#bfdbfe;background:rgba(59,130,246,.18)}.ticket-status-pending{color:#fde68a;background:rgba(245,158,11,.18)}.ticket-status-completed{color:#a7f3d0;background:rgba(16,185,129,.17)}.leader-app button:active,.leader-app .route-stop:active{transform:scale(.97)}.leader-app button:hover{filter:brightness(1.1)}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}@keyframes slide-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-  @media(max-width:1050px){.leader-sidebar{width:68px;padding:22px 10px}.leader-brand span,.leader-nav-link{font-size:0}.leader-nav-link i{width:auto;font-size:17px}.connection-badge{font-size:0;justify-content:center}.leader-profile{gap:7px}.leader-user>div{display:none}.resource-form{grid-template-columns:repeat(3,1fr)}.resource-submit{grid-column:1/-1;min-height:44px}}@media(max-width:760px){.leader-app{display:block}.leader-sidebar{position:fixed;z-index:10;bottom:0;top:auto;width:100%;height:61px;flex-direction:row;align-items:center;justify-content:space-around;padding:7px;border-top:1px solid var(--line);border-right:0}.leader-brand,.connection-badge{display:none}.leader-nav{display:flex;width:100%;justify-content:space-around}.leader-nav-link{padding:10px}.leader-header{position:relative;flex-direction:column;padding:20px}.leader-profile{width:100%;justify-content:space-between}.header-sos-button{font-size:10px}.leader-dashboard-content{padding:20px 16px 80px}.leader-overview-grid,.route-map-layout{grid-template-columns:1fr}.leader-hero-card,.route-heading{align-items:flex-start;flex-direction:column}.route-eta{width:100%}.stat-grid,.resource-form{grid-template-columns:1fr}.resource-submit{grid-column:auto}.nearby-volunteers-heading{flex-direction:column}.volunteer-card{align-items:flex-start;flex-wrap:wrap}.volunteer-shared{margin-left:54px}.ticket-item{align-items:flex-start}.ticket-status{white-space:nowrap}}
-`}</style>; }
+
+const styles = `
+  :root {
+    color-scheme: light;
+    --smartvari-bg-1: #f8fafc;
+    --smartvari-bg-2: #eff6ff;
+    --smartvari-bg-3: #f0fdfa;
+    --smartvari-card: rgba(255, 255, 255, 0.86);
+    --smartvari-card-strong: linear-gradient(135deg, #ffffff, #f8fbff);
+    --smartvari-border: #dce7f5;
+    --smartvari-line: rgba(148, 163, 184, 0.2);
+    --smartvari-text: #0f172a;
+    --smartvari-body: #475569;
+    --smartvari-muted: #64748b;
+    --smartvari-label: #334155;
+    --smartvari-blue: #2563eb;
+    --smartvari-cyan: #06b6d4;
+    --smartvari-emerald: #10b981;
+    --smartvari-amber: #f59e0b;
+    --smartvari-red: #ef4444;
+    --shadow-soft: 0 14px 30px rgba(37, 99, 235, 0.08);
+    --shadow-card: 0 10px 22px rgba(15, 23, 42, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  .dindi-shell {
+    min-height: 100vh;
+    display: flex;
+    gap: 20px;
+    padding: 24px;
+    background:
+      radial-gradient(circle at top right, rgba(96, 165, 250, 0.16), transparent 26%),
+      radial-gradient(circle at bottom left, rgba(103, 232, 249, 0.12), transparent 22%),
+      linear-gradient(135deg, #f8fbff, #eef7ff, #f4fbff);
+    color: var(--smartvari-text);
+    font-family: Inter, Arial, sans-serif;
+    font-size: 0.68rem;
+  }
+
+  .dindi-sidebar {
+    width: 280px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 250, 255, 0.92));
+    border: 1px solid var(--smartvari-border);
+    border-radius: 20px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .brand-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--smartvari-line);
+  }
+
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--smartvari-blue), var(--smartvari-cyan));
+    color: #ffffff;
+    font-weight: 800;
+    box-shadow: 0 12px 18px rgba(37, 99, 235, 0.18);
+  }
+
+  .brand-row small,
+  .brand-row strong {
+    display: block;
+  }
+
+  .brand-row small {
+    color: var(--smartvari-muted);
+  }
+
+  .brand-row strong {
+    color: var(--smartvari-text);
+    font-size: 0.95rem;
+  }
+
+  .section-label {
+    color: var(--smartvari-blue);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  .select-control,
+  .forms-grid input,
+  .forms-grid select,
+  .forms-grid textarea,
+  .request-row input,
+  .request-row textarea {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--smartvari-border);
+    background: rgba(255,255,255,0.75);
+    color: var(--smartvari-text);
+    padding: 10px 12px;
+    font: inherit;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  }
+
+  .select-control:focus,
+  .forms-grid input:focus,
+  .forms-grid select:focus,
+  .forms-grid textarea:focus,
+  .request-row input:focus,
+  .request-row textarea:focus {
+    outline: none;
+    border-color: rgba(37, 99, 235, 0.45);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.10);
+    background: #ffffff;
+  }
+
+  .forms-grid textarea,
+  .request-row textarea {
+    resize: vertical;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .small-button {
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  .primary-button:hover,
+  .ghost-button:hover,
+  .small-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .primary-button {
+    background: linear-gradient(135deg, var(--smartvari-blue), var(--smartvari-cyan));
+    color: #ffffff;
+    padding: 11px 14px;
+    font-weight: 700;
+    box-shadow: 0 12px 22px rgba(37, 99, 235, 0.18);
+  }
+
+  .small-button {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(6, 182, 212, 0.12));
+    color: var(--smartvari-blue);
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .ghost-button {
+    background: linear-gradient(135deg, #ffffff, #f8fbff);
+    color: var(--smartvari-text);
+    padding: 9px 12px;
+    border: 1px solid var(--smartvari-border);
+  }
+
+  .full-width { width: 100%; }
+
+  .dindi-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 2px 4px;
+  }
+
+  .eyebrow {
+    margin: 0 0 6px;
+    color: var(--smartvari-blue);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  h1, h2, h3, p { margin: 0; }
+
+  .topbar h1 {
+    font-size: clamp(1.35rem, 1.7vw, 2rem);
+    color: var(--smartvari-text);
+    letter-spacing: -0.04em;
+  }
+
+  .overview-grid,
+  .content-grid {
+    display: grid;
+    gap: 18px;
+  }
+
+  .overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .content-grid {
+    grid-template-columns: 1.15fr 1fr;
+  }
+
+  .stack-column {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.86));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .large-card {
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 248, 255, 0.9));
+  }
+
+  .large-card label,
+  .card-head h3 {
+    color: var(--smartvari-label);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 800;
+  }
+
+  .metric-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .metric-row strong {
+    font-size: clamp(1.5rem, 2.2vw, 2.2rem);
+    letter-spacing: -0.05em;
+    color: var(--smartvari-text);
+  }
+
+  .metric-row span,
+  .muted,
+  .list-item span,
+  .list-item small {
+    color: var(--smartvari-muted);
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .forms-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .compact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forms-grid label,
+  .request-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .forms-grid span {
+    color: var(--smartvari-label);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .full-span {
+    grid-column: 1 / -1;
+  }
+
+  .route-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: var(--smartvari-text);
+  }
+
+  .divider {
+    color: var(--smartvari-blue);
+  }
+
+  .list-box {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--smartvari-border);
+    background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(239,246,255,0.76));
+  }
+
+  .compact-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 8px;
+  }
+
+  .compact-item > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .request-row {
+    gap: 12px;
+  }
+
+  .request-row input,
+  .request-row textarea {
+    min-height: 44px;
+  }
+
+  .list-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .request-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .request-item > div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 82px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .status-warning { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+  .status-info { background: rgba(59, 130, 246, 0.10); color: #1d4ed8; }
+  .status-success { background: rgba(16, 185, 129, 0.10); color: #047857; }
+  .status-danger { background: rgba(239, 68, 68, 0.10); color: #b91c1c; }
+
+  .inline-error {
+    display: block;
+    color: #b91c1c;
+    background: rgba(254, 226, 226, 0.9);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .dindi-empty {
+    width: 100%;
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(37, 99, 235, 0.08), transparent 30%),
+      linear-gradient(135deg, var(--smartvari-bg-1), var(--smartvari-bg-2), var(--smartvari-bg-3));
+  }
+
+  .dindi-empty-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    width: min(420px, calc(100vw - 40px));
+    padding: 34px 28px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,249,255,0.94));
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    text-align: center;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .dindi-empty-card h2 {
+    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    color: var(--smartvari-text);
+  }
+
+  .dindi-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.18);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    z-index: 20;
+  }
+
+  .dindi-modal {
+    width: min(700px, 100%);
+    background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(240,249,255,0.9));
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .toast-error {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    max-width: 400px;
+    background: rgba(254, 226, 226, 0.96);
+    color: #991b1b;
+    border: 1px solid rgba(239, 68, 68, 0.18);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  }
+
+  @media (max-width: 980px) {
+    .dindi-shell { flex-direction: column; }
+    .dindi-sidebar { width: 100%; }
+    .overview-grid, .content-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    .dindi-shell { padding: 16px; }
+    .forms-grid, .compact-grid { grid-template-columns: 1fr; }
+    .route-summary { flex-wrap: wrap; }
+    .request-item { flex-wrap: wrap; }
+  }
+`;
