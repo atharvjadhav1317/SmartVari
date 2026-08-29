@@ -97,11 +97,19 @@ export default function DindiLeaderDashboard() {
   const [haltError, setHaltError] = useState('');
   const [haltLoading, setHaltLoading] = useState(false);
   const [requestForm, setRequestForm] = useState({
-    FOOD: { quantity: '20', notes: '' },
-    WATER: { quantity: '50', notes: '' },
+    locationType: '',
+    location: '',
+    latitude: '',
+    longitude: '',
+    requiredDate: '',
+    requiredTime: '',
+    resourceType: 'FOOD',
+    quantity: '',
+    unit: 'packets',
+    notes: '',
   });
   const [requestError, setRequestError] = useState('');
-  const [requestLoading, setRequestLoading] = useState({ FOOD: false, WATER: false });
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const selectedWariName = selectedWari?.name || 'Selected Wari';
 
@@ -326,38 +334,62 @@ export default function DindiLeaderDashboard() {
     }
   };
 
-  const handleRequestSubmit = async (resourceType) => {
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setRequestError('Location is not available in this browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setRequestForm((current) => ({ ...current, locationType: 'CUSTOM', location: 'Current device location', latitude: String(coords.latitude), longitude: String(coords.longitude) })),
+      () => setRequestError('Please allow location access to use your current location.'),
+    );
+  };
+
+  const handleRequestSubmit = async (event) => {
+    event.preventDefault();
     if (!selectedWariId) {
       setRequestError('Choose a Wari before submitting a request.');
       return;
     }
 
-    const quantity = Number(requestForm[resourceType].quantity || 0);
-    const notes = requestForm[resourceType].notes?.trim() || '';
+    const quantity = Number(requestForm.quantity || 0);
+    const notes = requestForm.notes.trim();
+    const selectedHalt = halts.find((halt) => halt.id === requestForm.locationType);
+    const latitude = requestForm.locationType === 'CUSTOM' ? Number(requestForm.latitude) : selectedHalt?.latitude ?? null;
+    const longitude = requestForm.locationType === 'CUSTOM' ? Number(requestForm.longitude) : selectedHalt?.longitude ?? null;
 
     if (!quantity || quantity <= 0) {
-      setRequestError(`${resourceType} quantity must be greater than zero.`);
+      setRequestError('Quantity must be greater than zero.');
+      return;
+    }
+    if (!requestForm.locationType) {
+      setRequestError('Choose a halt or custom location.');
+      return;
+    }
+    if (requestForm.locationType === 'CUSTOM' && (!Number.isFinite(latitude) || !Number.isFinite(longitude))) {
+      setRequestError('Enter valid latitude and longitude for the custom location.');
       return;
     }
 
-    setRequestLoading((current) => ({ ...current, [resourceType]: true }));
+    setRequestLoading(true);
     setRequestError('');
 
     try {
       await createResourceRequest({
         wari_id: selectedWariId,
-        halt_id: halts[0]?.id || null,
-        resource_type: resourceType,
+        halt_id: requestForm.locationType === 'CUSTOM' ? null : requestForm.locationType,
+        request_latitude: latitude,
+        request_longitude: longitude,
+        required_date: requestForm.requiredDate || null,
+        required_time: requestForm.requiredTime || null,
+        resource_type: requestForm.resourceType,
         quantity,
-        unit: resourceType === 'FOOD' ? 'meals' : 'litres',
+        unit: requestForm.unit,
         notes,
         status: 'PENDING',
       });
 
-      setRequestForm((current) => ({
-        ...current,
-        [resourceType]: { quantity: resourceType === 'FOOD' ? '20' : '50', notes: '' },
-      }));
+      setRequestForm((current) => ({ ...current, quantity: '', notes: '' }));
 
       const [activeRows, historyRows] = await Promise.all([
         listLiveResourceRequests(selectedWariId),
@@ -370,7 +402,7 @@ export default function DindiLeaderDashboard() {
       console.error('Request submission failed', requestFailure);
       setRequestError(requestFailure?.message || 'Unable to create resource request.');
     } finally {
-      setRequestLoading((current) => ({ ...current, [resourceType]: false }));
+      setRequestLoading(false);
     }
   };
 
@@ -568,123 +600,28 @@ export default function DindiLeaderDashboard() {
               </div>
             </article>
 
-            <article className="card form-card">
-              <div className="card-head">
-                <h3>Today’s halts</h3>
-              </div>
-
-              <form onSubmit={handleAddHalt} className="forms-grid compact-grid">
-                <label>
-                  <span>Day</span>
-                  <input type="number" min="1" value={haltDraft.day_number} onChange={(event) => setHaltDraft((current) => ({ ...current, day_number: event.target.value }))} />
-                </label>
-                <label>
-                  <span>Sequence</span>
-                  <input type="number" min="1" value={haltDraft.sequence_order} onChange={(event) => setHaltDraft((current) => ({ ...current, sequence_order: event.target.value }))} />
-                </label>
-                <label className="full-span">
-                  <span>Halt name</span>
-                  <input value={haltDraft.halt_name} onChange={(event) => setHaltDraft((current) => ({ ...current, halt_name: event.target.value }))} />
-                </label>
-                <label>
-                  <span>Latitude</span>
-                  <input type="number" step="0.000001" value={haltDraft.latitude} onChange={(event) => setHaltDraft((current) => ({ ...current, latitude: event.target.value }))} />
-                </label>
-                <label>
-                  <span>Longitude</span>
-                  <input type="number" step="0.000001" value={haltDraft.longitude} onChange={(event) => setHaltDraft((current) => ({ ...current, longitude: event.target.value }))} />
-                </label>
-                <label>
-                  <span>Type</span>
-                  <select value={haltDraft.halt_type} onChange={(event) => setHaltDraft((current) => ({ ...current, halt_type: event.target.value }))}>
-                    {['START', 'REST', 'FOOD', 'WATER', 'MEDICAL', 'LUNCH', 'NIGHT', 'DESTINATION', 'OTHER'].map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Arrival</span>
-                  <input type="time" value={haltDraft.arrival_time} onChange={(event) => setHaltDraft((current) => ({ ...current, arrival_time: event.target.value }))} />
-                </label>
-                <label>
-                  <span>Departure</span>
-                  <input type="time" value={haltDraft.departure_time} onChange={(event) => setHaltDraft((current) => ({ ...current, departure_time: event.target.value }))} />
-                </label>
-                <label className="full-span">
-                  <span>Notes</span>
-                  <textarea rows={3} value={haltDraft.notes} onChange={(event) => setHaltDraft((current) => ({ ...current, notes: event.target.value }))} />
-                </label>
-
-                {haltError ? <div className="inline-error full-span">{haltError}</div> : null}
-
-                <button className="primary-button full-span" type="submit" disabled={haltLoading}>
-                  {haltLoading ? 'Saving halt…' : 'Add halt'}
-                </button>
-              </form>
-
-              <div className="list-box">
-                {haltsLoading ? <div className="muted">Loading halts…</div> : null}
-                {!haltsLoading && halts.length === 0 ? <div className="muted">No halts saved yet.</div> : null}
-
-                {halts.map((halt) => (
-                  <div key={halt.id} className="list-item compact-item">
-                    <div>
-                      <strong>{halt.halt_name}</strong>
-                      <span>{halt.halt_type}</span>
-                    </div>
-                    <small>Day {halt.day_number} · #{halt.sequence_order}</small>
-                    <small>{halt.latitude}, {halt.longitude}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
           </div>
 
           <div className="stack-column">
-            <article className="card form-card">
-              <div className="card-head">
-                <h3>Food</h3>
-              </div>
-              <div className="request-row">
-                <input
-                  type="number"
-                  min="1"
-                  value={requestForm.FOOD.quantity}
-                  onChange={(event) => setRequestForm((current) => ({ ...current, FOOD: { ...current.FOOD, quantity: event.target.value } }))}
-                />
-                <textarea
-                  rows={2}
-                  value={requestForm.FOOD.notes}
-                  onChange={(event) => setRequestForm((current) => ({ ...current, FOOD: { ...current.FOOD, notes: event.target.value } }))}
-                  placeholder="Notes"
-                />
-                <button type="button" className="primary-button" onClick={() => handleRequestSubmit('FOOD')} disabled={requestLoading.FOOD}>
-                  {requestLoading.FOOD ? 'Sending…' : 'REQUEST FOOD'}
-                </button>
-              </div>
-            </article>
-
-            <article className="card form-card">
-              <div className="card-head">
-                <h3>Water</h3>
-              </div>
-              <div className="request-row">
-                <input
-                  type="number"
-                  min="1"
-                  value={requestForm.WATER.quantity}
-                  onChange={(event) => setRequestForm((current) => ({ ...current, WATER: { ...current.WATER, quantity: event.target.value } }))}
-                />
-                <textarea
-                  rows={2}
-                  value={requestForm.WATER.notes}
-                  onChange={(event) => setRequestForm((current) => ({ ...current, WATER: { ...current.WATER, notes: event.target.value } }))}
-                  placeholder="Notes"
-                />
-                <button type="button" className="primary-button" onClick={() => handleRequestSubmit('WATER')} disabled={requestLoading.WATER}>
-                  {requestLoading.WATER ? 'Sending…' : 'REQUEST WATER'}
-                </button>
-              </div>
+            <article className="card form-card support-request-card">
+              <div className="card-head"><h3>Request Support</h3></div>
+              <form onSubmit={handleRequestSubmit} className="forms-grid compact-grid">
+                <label className="full-span"><span>Delivery location</span><select value={requestForm.locationType} onChange={(event) => setRequestForm((current) => ({ ...current, locationType: event.target.value, location: event.target.value === 'CUSTOM' ? '' : (halts.find((halt) => halt.id === event.target.value)?.halt_name || '') }))}><option value="">Select halt or custom location</option>{halts.map((halt) => <option key={halt.id} value={halt.id}>{halt.halt_name}</option>)}<option value="CUSTOM">Custom location</option></select></label>
+                {requestForm.locationType === 'CUSTOM' ? <>
+                  <label><span>Location name</span><input value={requestForm.location} onChange={(event) => setRequestForm((current) => ({ ...current, location: event.target.value }))} placeholder="Route location" /></label>
+                  <div className="location-action"><button type="button" className="small-button" onClick={handleUseCurrentLocation}>Use current location</button></div>
+                  <label><span>Latitude</span><input type="number" step="0.000001" value={requestForm.latitude} onChange={(event) => setRequestForm((current) => ({ ...current, latitude: event.target.value }))} /></label>
+                  <label><span>Longitude</span><input type="number" step="0.000001" value={requestForm.longitude} onChange={(event) => setRequestForm((current) => ({ ...current, longitude: event.target.value }))} /></label>
+                </> : null}
+                <label><span>Required date</span><input type="date" value={requestForm.requiredDate} onChange={(event) => setRequestForm((current) => ({ ...current, requiredDate: event.target.value }))} /></label>
+                <label><span>Required time</span><input type="time" value={requestForm.requiredTime} onChange={(event) => setRequestForm((current) => ({ ...current, requiredTime: event.target.value }))} /></label>
+                <div className="resource-toggle full-span"><span>Resource</span><div><button type="button" className={requestForm.resourceType === 'FOOD' ? 'selected' : ''} onClick={() => setRequestForm((current) => ({ ...current, resourceType: 'FOOD', unit: 'packets' }))}>Food</button><button type="button" className={requestForm.resourceType === 'WATER' ? 'selected' : ''} onClick={() => setRequestForm((current) => ({ ...current, resourceType: 'WATER', unit: 'litres' }))}>Water</button></div></div>
+                <label><span>Quantity</span><input type="number" min="1" value={requestForm.quantity} onChange={(event) => setRequestForm((current) => ({ ...current, quantity: event.target.value }))} placeholder="Quantity" required /></label>
+                <label><span>Unit</span><input value={requestForm.unit} onChange={(event) => setRequestForm((current) => ({ ...current, unit: event.target.value }))} placeholder={requestForm.resourceType === 'FOOD' ? 'packets' : 'litres'} required /></label>
+                <label className="full-span"><span>Additional instructions</span><textarea rows={2} value={requestForm.notes} onChange={(event) => setRequestForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Deliver near the school ground" /></label>
+                {requestError ? <div className="inline-error full-span">{requestError}</div> : null}
+                <button className="primary-button full-span" type="submit" disabled={requestLoading}>{requestLoading ? 'Sending…' : 'Request Support'}</button>
+              </form>
             </article>
 
             <article className="card list-card">
@@ -1084,6 +1021,44 @@ const styles = `
 
   .full-span {
     grid-column: 1 / -1;
+  }
+
+  .resource-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .resource-toggle > div {
+    display: inline-flex;
+    width: fit-content;
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid var(--smartvari-border);
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  .resource-toggle button {
+    min-width: 92px;
+    padding: 9px 16px;
+    border: 0;
+    border-radius: 9px;
+    color: var(--smartvari-muted);
+    background: transparent;
+    cursor: pointer;
+    font-weight: 800;
+  }
+
+  .resource-toggle button.selected {
+    color: #fff;
+    background: linear-gradient(135deg, var(--smartvari-blue), #6366f1);
+    box-shadow: 0 6px 14px rgba(59, 130, 246, .18);
+  }
+
+  .location-action {
+    display: flex;
+    align-items: end;
   }
 
   .route-summary {

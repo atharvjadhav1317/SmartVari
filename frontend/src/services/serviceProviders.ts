@@ -24,6 +24,10 @@ export type ServiceRequestRecord = {
   id: string;
   wari_id?: string | null;
   halt_id?: string | null;
+  request_latitude?: number | null;
+  request_longitude?: number | null;
+  required_date?: string | null;
+  required_time?: string | null;
   resource_type?: string | null;
   quantity?: number | null;
   unit?: string | null;
@@ -45,6 +49,12 @@ export type ServiceRequestRecord = {
     name?: string | null;
     source?: string | null;
     destination?: string | null;
+  }[] | null;
+  wari_halts?: {
+    id?: string | null;
+    halt_name?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
   }[] | null;
 };
 
@@ -199,7 +209,7 @@ export async function listAvailableResourceRequests(): Promise<ServiceRequestRec
 
   const { data, error } = await supabaseClient
     .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination)')
+    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
     .is('service_provider_id', null)
     .eq('status', 'PENDING')
     .order('requested_at', { ascending: false });
@@ -293,7 +303,7 @@ export async function getMyActiveDeliveries(providerId: string): Promise<Service
 
   const { data, error } = await supabaseClient
     .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination)')
+    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
     .eq('service_provider_id', providerId)
     .in('delivery_status', ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
     .order('accepted_at', { ascending: false });
@@ -313,7 +323,7 @@ export async function getMyDeliveryHistory(providerId: string): Promise<ServiceR
 
   const { data, error } = await supabaseClient
     .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination)')
+    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
     .eq('service_provider_id', providerId)
     .in('delivery_status', ['DELIVERED', 'CANCELLED'])
     .order('delivered_at', { ascending: false, nullsFirst: false });

@@ -62,7 +62,8 @@ const badgeClass = (status?: string | null) => {
   }
 };
 
-const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Time unavailable');
+const formatRequiredDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Date not set');
+const formatRequiredTime = (value?: string | null) => (value ? new Date(`1970-01-01T${value}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time not set');
 
 const deliveryStages = ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
@@ -404,9 +405,10 @@ export function ServiceProviderDashboard() {
                         <span className="smartvari-tag">
                           {formatResourceType(request.resource_type)} · {request.quantity ?? 0} {request.unit || 'units'}
                         </span>
-                        <span className="smartvari-tag warning">{request.halt_id ? `Halt: ${request.halt_id}` : request.notes || 'Support request'}</span>
-                        <span className="smartvari-tag">Requested {formatDate(request.requested_at)}</span>
+                        <span className="smartvari-tag warning">📍 {request.wari_halts?.[0]?.halt_name || (request.request_latitude != null && request.request_longitude != null ? `${request.request_latitude}, ${request.request_longitude}` : 'Location not set')}</span>
+                        <span className="smartvari-tag">📅 {formatRequiredDate(request.required_date)} · 🕐 {formatRequiredTime(request.required_time)}</span>
                       </div>
+                      {request.notes && <small className="smartvari-request-note">{request.notes}</small>}
 
                       <div className="smartvari-request-actions">
                         <button type="button" className="smartvari-danger-btn">

@@ -7,6 +7,10 @@ export type ResourceRequest = {
   id: string;
   wari_id: string;
   halt_id?: string | null;
+  request_latitude?: number | null;
+  request_longitude?: number | null;
+  required_date?: string | null;
+  required_time?: string | null;
   resource_type: ResourceRequestType | string;
   quantity: number;
   unit: string;
@@ -24,6 +28,10 @@ export type CreateResourceRequestInput = {
   quantity: number;
   unit: string;
   halt_id?: string | null;
+  request_latitude?: number | null;
+  request_longitude?: number | null;
+  required_date?: string | null;
+  required_time?: string | null;
   status?: ResourceRequestStatus | string;
   notes?: string | null;
 };
@@ -86,6 +94,10 @@ export async function createResourceRequest(input: CreateResourceRequestInput): 
     .insert({
       wari_id: input.wari_id,
       halt_id: input.halt_id ?? null,
+      request_latitude: input.request_latitude ?? null,
+      request_longitude: input.request_longitude ?? null,
+      required_date: input.required_date ?? null,
+      required_time: input.required_time ?? null,
       resource_type: (input.resource_type ?? 'FOOD').toUpperCase(),
       quantity: Number(input.quantity) || 0,
       unit: input.unit ?? 'units',

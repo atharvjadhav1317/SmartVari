@@ -127,6 +127,10 @@ create table if not exists public.resource_requests (
   id uuid primary key default gen_random_uuid(),
   wari_id uuid not null,
   halt_id uuid,
+  request_latitude double precision,
+  request_longitude double precision,
+  required_date date,
+  required_time time,
   service_provider_id uuid,
   resource_type text not null default 'FOOD',
   quantity numeric(12,2) not null default 0,
@@ -146,6 +150,10 @@ create table if not exists public.resource_requests (
 
 alter table public.resource_requests add column if not exists wari_id uuid;
 alter table public.resource_requests add column if not exists halt_id uuid;
+alter table public.resource_requests add column if not exists request_latitude double precision;
+alter table public.resource_requests add column if not exists request_longitude double precision;
+alter table public.resource_requests add column if not exists required_date date;
+alter table public.resource_requests add column if not exists required_time time;
 alter table public.resource_requests add column if not exists service_provider_id uuid;
 alter table public.resource_requests add column if not exists resource_type text default 'FOOD';
 alter table public.resource_requests add column if not exists quantity numeric(12,2) default 0;
