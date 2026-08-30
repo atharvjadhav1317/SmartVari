@@ -70,6 +70,11 @@ const formatRequiredTime = (value?: string | null) => (value ? new Date(`1970-01
 
 const deliveryStages = ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
+const displayCapacity = (value: number | null | undefined) => {
+  const capacity = Number(value);
+  return Number.isFinite(capacity) && capacity >= 0 ? capacity : 0;
+};
+
 export function ServiceProviderDashboard() {
   const [provider, setProvider] = useState<ServiceProvider | null>(null);
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
@@ -395,6 +400,25 @@ export function ServiceProviderDashboard() {
                       <strong>{stats.completed}</strong>
                     </div>
                   </div>
+
+                  <div className="smartvari-capacity-section">
+                    <div className="smartvari-capacity-heading">
+                      <div>
+                        <span className="smartvari-capacity-eyebrow">DONATION CAPACITY</span>
+                        <p>Maximum support capacity registered by this volunteer.</p>
+                      </div>
+                    </div>
+                    <div className="smartvari-capacity-grid">
+                      <div className="smartvari-capacity-card food-capacity">
+                        <span>Food</span>
+                        <strong>{displayCapacity(provider.food_capacity)} packets</strong>
+                      </div>
+                      <div className="smartvari-capacity-card water-capacity">
+                        <span>Water</span>
+                        <strong>{displayCapacity(provider.water_capacity)} litres</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
@@ -486,7 +510,7 @@ export function ServiceProviderDashboard() {
 
                       <div className="smartvari-request-tags">
                         <span className="smartvari-tag">
-                          {formatResourceType(request.resource_type)} · {request.quantity ?? 0} {request.unit || 'units'}
+                          {formatResourceType(request.resource_type)} · {request.allocated_quantity ?? request.quantity ?? 0} {request.unit || 'units'}
                         </span>
                         <span className="smartvari-tag warning">📍 {request.wari_halts?.[0]?.halt_name || (request.request_latitude != null && request.request_longitude != null ? `${request.request_latitude}, ${request.request_longitude}` : 'Location not set')}</span>
                         <span className="smartvari-tag">📅 {formatRequiredDate(request.required_date)} · 🕐 {formatRequiredTime(request.required_time)}</span>
@@ -545,7 +569,7 @@ export function ServiceProviderDashboard() {
 
                       <div className="smartvari-delivery-meta">
                         <span className="smartvari-tag">
-                          {formatResourceType(delivery.resource_type)} · {delivery.quantity ?? 0} {delivery.unit || 'units'}
+                          {formatResourceType(delivery.resource_type)} · {delivery.allocated_quantity ?? delivery.quantity ?? 0} {delivery.unit || 'units'}
                         </span>
                         <span className="smartvari-tag success">{delivery.accepted_at ? 'Assigned' : 'New'}</span>
                       </div>
@@ -601,7 +625,7 @@ export function ServiceProviderDashboard() {
                         {item.waris?.[0]?.name || item.waris?.[0]?.wari_code || 'Wari route'}
                       </strong>
                       <small>
-                        {formatResourceType(item.resource_type)} · {item.quantity ?? 0} {item.unit || 'units'}
+                        {formatResourceType(item.resource_type)} · {item.allocated_quantity ?? item.quantity ?? 0} {item.unit || 'units'}
                       </small>
                       <div className="smartvari-request-actions" style={{ justifyContent: 'flex-start' }}>
                         <span className={`smartvari-tag ${badgeClass(item.delivery_status || item.status)}`}>

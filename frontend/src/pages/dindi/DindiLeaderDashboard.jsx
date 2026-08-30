@@ -675,7 +675,7 @@ export default function DindiLeaderDashboard() {
               {liveRequests.length === 0 ? <div className="muted">No live requests.</div> : null}
               {liveRequests.map((request) => (
                 <div key={request.id} className="list-item request-item delivery-request-item">
-                  <div className="delivery-request-summary"><strong>{request.resource_type} · {request.quantity} {request.unit}</strong><span>📍 {request.waris?.[0]?.name || selectedWariName}{request.request_latitude != null && request.request_longitude != null ? ` · ${request.request_latitude}, ${request.request_longitude}` : ''}</span><span>📅 {formatRequestDate(request.required_date)} · 🕐 {formatRequestTime(request.required_time)}</span><span>Volunteer: {request.request_provider?.[0]?.name || 'Not assigned'}</span></div>
+                  <div className="delivery-request-summary"><strong>{request.resource_type} · {request.quantity} {request.unit}</strong><span>📍 {request.waris?.[0]?.name || selectedWariName}{request.request_latitude != null && request.request_longitude != null ? ` · ${request.request_latitude}, ${request.request_longitude}` : ''}</span><span>📅 {formatRequestDate(request.required_date)} · 🕐 {formatRequestTime(request.required_time)}</span><span>Volunteer: {request.request_provider?.[0]?.name || 'Not assigned'}</span>{request.resource_request_allocations?.length ? <div className="allocation-summary"><strong>Provider allocations</strong>{request.resource_request_allocations.map((allocation) => { const provider = Array.isArray(allocation.service_providers) ? allocation.service_providers[0] : allocation.service_providers; return <span key={allocation.id}>✓ {provider?.name || 'Provider'} — {allocation.allocated_quantity} {request.unit} — {allocation.status}</span>; })}</div> : null}</div>
                   <div className="dindi-delivery-progress">
                     {deliveryStages.map((stage, index) => { const currentIndex = deliveryStages.findIndex((item) => item.key === deliveryStatusFor(request)); const complete = index < currentIndex; const current = index === currentIndex; return <div key={stage.key} className={`dindi-delivery-step ${complete ? 'complete' : ''} ${current ? 'current' : ''}`}><span>{complete ? '✓' : current ? '●' : '○'}</span><small>{stage.label}</small>{index < deliveryStages.length - 1 ? <i /> : null}</div>; })}
                   </div>
@@ -1165,6 +1165,19 @@ const styles = `
   .delivery-request-summary span,
   .delivery-request-item small {
     color: var(--smartvari-muted);
+    font-size: 12px;
+  }
+
+  .allocation-summary {
+    display: grid;
+    gap: 3px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--smartvari-border);
+  }
+
+  .allocation-summary strong {
+    color: var(--smartvari-text);
     font-size: 12px;
   }
 

@@ -174,6 +174,31 @@ alter table public.resource_requests add column if not exists notes text;
 alter table public.resource_requests add column if not exists created_at timestamptz default now();
 alter table public.resource_requests add column if not exists updated_at timestamptz default now();
 
+create table if not exists public.resource_request_allocations (
+  id uuid primary key default gen_random_uuid(),
+  resource_request_id uuid not null,
+  service_provider_id uuid not null,
+  allocated_quantity numeric(12,2) not null,
+  status text not null default 'PENDING',
+  accepted_at timestamptz,
+  delivery_started_at timestamptz,
+  arrived_at timestamptz,
+  delivered_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.resource_request_allocations add column if not exists resource_request_id uuid;
+alter table public.resource_request_allocations add column if not exists service_provider_id uuid;
+alter table public.resource_request_allocations add column if not exists allocated_quantity numeric(12,2) default 0;
+alter table public.resource_request_allocations add column if not exists status text default 'PENDING';
+alter table public.resource_request_allocations add column if not exists accepted_at timestamptz;
+alter table public.resource_request_allocations add column if not exists delivery_started_at timestamptz;
+alter table public.resource_request_allocations add column if not exists arrived_at timestamptz;
+alter table public.resource_request_allocations add column if not exists delivered_at timestamptz;
+alter table public.resource_request_allocations add column if not exists created_at timestamptz default now();
+alter table public.resource_request_allocations add column if not exists updated_at timestamptz default now();
+
 -- 4) Add compatibility constraints only when they are safe and not already present.
 do $$
 begin
@@ -215,6 +240,18 @@ begin
     alter table public.resource_requests
       add constraint resource_requests_service_provider_fkey
       foreign key (service_provider_id) references public.service_providers(id) on delete set null not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'resource_request_allocations_request_fkey') then
+    alter table public.resource_request_allocations
+      add constraint resource_request_allocations_request_fkey
+      foreign key (resource_request_id) references public.resource_requests(id) on delete cascade not valid;
+  end if;
+
+  if not exists (select 1 from pg_constraint where conname = 'resource_request_allocations_provider_fkey') then
+    alter table public.resource_request_allocations
+      add constraint resource_request_allocations_provider_fkey
+      foreign key (service_provider_id) references public.service_providers(id) on delete cascade not valid;
   end if;
 
 end $$;
@@ -349,6 +386,47 @@ create index if not exists idx_service_providers_location on public.service_prov
 create index if not exists idx_resource_requests_wari_status on public.resource_requests (wari_id, status, requested_at desc);
 create index if not exists idx_resource_requests_halt_id on public.resource_requests (halt_id);
 create index if not exists idx_resource_requests_provider on public.resource_requests (service_provider_id, delivery_status);
+create index if not exists idx_resource_request_allocations_provider on public.resource_request_allocations (service_provider_id, status);
+create index if not exists idx_resource_request_allocations_request on public.resource_request_allocations (resource_request_id);
+
+create or replace function public.sync_resource_request_allocation_status()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  allocation_count integer;
+  delivered_count integer;
+  active_status text;
+begin
+  select count(*), count(*) filter (where status = 'DELIVERED')
+    into allocation_count, delivered_count
+  from public.resource_request_allocations
+  where resource_request_id = new.resource_request_id;
+
+  if allocation_count > 0 and delivered_count = allocation_count then
+    update public.resource_requests
+    set delivery_status = 'DELIVERED', status = 'FULFILLED', fulfilled_at = coalesce(fulfilled_at, now()), updated_at = now()
+    where id = new.resource_request_id;
+  else
+    select status into active_status
+    from public.resource_request_allocations
+    where resource_request_id = new.resource_request_id
+    order by case status when 'IN_TRANSIT' then 1 when 'ARRIVED' then 2 when 'ACCEPTED' then 3 else 4 end
+    limit 1;
+    update public.resource_requests
+    set delivery_status = coalesce(active_status, 'PENDING'), updated_at = now()
+    where id = new.resource_request_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_resource_request_allocation_status on public.resource_request_allocations;
+create trigger sync_resource_request_allocation_status
+after insert or update of status on public.resource_request_allocations
+for each row execute function public.sync_resource_request_allocation_status();
 
 -- Atomically creates a request and assigns the nearest suitable available provider.
 -- Uses Haversine distance so it does not require PostGIS.
@@ -371,40 +449,16 @@ security invoker
 set search_path = public
 as $$
 declare
-  nearest_provider_id uuid;
   created_request public.resource_requests;
   normalized_resource_type text := upper(coalesce(p_resource_type, 'FOOD'));
+  remaining_quantity numeric := greatest(coalesce(p_quantity, 0), 0);
+  provider_capacity numeric;
+  provider record;
 begin
   if p_request_latitude is null or p_request_longitude is null
     or p_request_latitude not between -90 and 90
     or p_request_longitude not between -180 and 180 then
     raise exception 'A valid request latitude and longitude are required for provider matching';
-  end if;
-
-  if p_request_latitude is not null and p_request_longitude is not null then
-    select provider.id
-      into nearest_provider_id
-    from public.service_providers provider
-    where upper(coalesce(provider.availability, '')) = 'AVAILABLE'
-      and provider.latitude is not null
-      and provider.longitude is not null
-      and provider.latitude between -90 and 90
-      and provider.longitude between -180 and 180
-      and (
-        normalized_resource_type not in ('FOOD', 'WATER')
-        or (normalized_resource_type = 'FOOD' and coalesce(provider.food_capacity, 0) >= coalesce(p_quantity, 0))
-        or (normalized_resource_type = 'WATER' and coalesce(provider.water_capacity, 0) >= coalesce(p_quantity, 0))
-      )
-      and (
-        upper(coalesce(provider.service_type, 'VOLUNTEER')) in ('VOLUNTEER', 'BOTH')
-        or upper(coalesce(provider.service_type, '')) = normalized_resource_type
-      )
-    order by 6371 * acos(least(1, greatest(-1,
-      cos(radians(p_request_latitude)) * cos(radians(provider.latitude)) *
-      cos(radians(provider.longitude) - radians(p_request_longitude)) +
-      sin(radians(p_request_latitude)) * sin(radians(provider.latitude))
-    )))
-    limit 1;
   end if;
 
   insert into public.resource_requests (
@@ -413,9 +467,53 @@ begin
     status, delivery_status, notes, requested_at, updated_at
   ) values (
     p_wari_id, p_halt_id, p_request_latitude, p_request_longitude, p_required_date,
-    p_required_time, nearest_provider_id, normalized_resource_type, coalesce(p_quantity, 0),
+    p_required_time, null, normalized_resource_type, coalesce(p_quantity, 0),
     coalesce(p_unit, 'units'), coalesce(p_status, 'PENDING'), 'PENDING', p_notes, now(), now()
   ) returning * into created_request;
+
+  for provider in
+    select provider_row.id,
+           case when normalized_resource_type = 'WATER'
+             then greatest(coalesce(provider_row.water_capacity, 0), 0)
+             else greatest(coalesce(provider_row.food_capacity, 0), 0)
+           end as available_capacity
+    from public.service_providers provider_row
+    where upper(coalesce(provider_row.availability, '')) = 'AVAILABLE'
+      and provider_row.latitude is not null
+      and provider_row.longitude is not null
+      and provider_row.latitude between -90 and 90
+      and provider_row.longitude between -180 and 180
+      and (
+        normalized_resource_type not in ('FOOD', 'WATER')
+        or (normalized_resource_type = 'FOOD' and coalesce(provider_row.food_capacity, 0) > 0)
+        or (normalized_resource_type = 'WATER' and coalesce(provider_row.water_capacity, 0) > 0)
+      )
+      and (
+        upper(coalesce(provider_row.service_type, 'VOLUNTEER')) in ('VOLUNTEER', 'BOTH')
+        or upper(coalesce(provider_row.service_type, '')) = normalized_resource_type
+      )
+    order by 6371 * acos(least(1, greatest(-1,
+      cos(radians(p_request_latitude)) * cos(radians(provider_row.latitude)) *
+      cos(radians(provider_row.longitude) - radians(p_request_longitude)) +
+      sin(radians(p_request_latitude)) * sin(radians(provider_row.latitude))
+    ))), provider_row.id
+  loop
+    exit when remaining_quantity <= 0;
+    provider_capacity := least(remaining_quantity, provider.available_capacity);
+    if provider_capacity > 0 then
+      insert into public.resource_request_allocations (
+        resource_request_id, service_provider_id, allocated_quantity
+      ) values (created_request.id, provider.id, provider_capacity);
+
+      if created_request.service_provider_id is null then
+        update public.resource_requests
+        set service_provider_id = provider.id, updated_at = now()
+        where id = created_request.id
+        returning * into created_request;
+      end if;
+      remaining_quantity := remaining_quantity - provider_capacity;
+    end if;
+  end loop;
 
   return created_request;
 end;
@@ -474,6 +572,7 @@ alter table public.wari_routes enable row level security;
 alter table public.wari_halts enable row level security;
 alter table public.service_providers enable row level security;
 alter table public.resource_requests enable row level security;
+alter table public.resource_request_allocations enable row level security;
 
 drop policy if exists "temp_dev_waris_select_anon" on public.waris;
 create policy "temp_dev_waris_select_anon" on public.waris
@@ -559,5 +658,17 @@ create policy "temp_dev_resource_requests_update_anon" on public.resource_reques
   for update to anon
   using (true)
   with check (true);
+
+drop policy if exists "temp_dev_resource_request_allocations_select_anon" on public.resource_request_allocations;
+create policy "temp_dev_resource_request_allocations_select_anon" on public.resource_request_allocations
+  for select to anon using (true);
+
+drop policy if exists "temp_dev_resource_request_allocations_insert_anon" on public.resource_request_allocations;
+create policy "temp_dev_resource_request_allocations_insert_anon" on public.resource_request_allocations
+  for insert to anon with check (true);
+
+drop policy if exists "temp_dev_resource_request_allocations_update_anon" on public.resource_request_allocations;
+create policy "temp_dev_resource_request_allocations_update_anon" on public.resource_request_allocations
+  for update to anon using (true) with check (true);
 
 commit;

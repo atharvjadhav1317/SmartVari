@@ -3,6 +3,13 @@ import { hasSupabaseConfig, supabaseClient } from './supabase';
 export type ResourceRequestType = 'FOOD' | 'WATER';
 export type ResourceRequestStatus = 'PENDING' | 'IN_PROGRESS' | 'FULFILLED' | 'CANCELLED';
 type ResourceProvider = { id?: string | null; name?: string | null };
+type ResourceAllocation = {
+  id: string;
+  service_provider_id: string;
+  allocated_quantity: number;
+  status: string;
+  service_providers?: ResourceProvider | ResourceProvider[] | null;
+};
 
 export type ResourceRequest = {
   id: string;
@@ -27,6 +34,7 @@ export type ResourceRequest = {
   delivered_at?: string | null;
   request_provider?: ResourceProvider[] | null;
   service_providers?: ResourceProvider | ResourceProvider[] | null;
+  resource_request_allocations?: ResourceAllocation[] | null;
 };
 
 export type CreateResourceRequestInput = {
@@ -50,7 +58,7 @@ export async function listLiveResourceRequests(wariId?: string): Promise<Resourc
 
   let query = supabaseClient
     .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name)')
+    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name), resource_request_allocations(id, service_provider_id, allocated_quantity, status, service_providers(id, name))')
     .in('delivery_status', ['PENDING', 'ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
     .order('requested_at', { ascending: false });
 
@@ -74,7 +82,7 @@ export async function listResourceRequestHistory(wariId?: string): Promise<Resou
 
   let query = supabaseClient
     .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name)')
+    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name), resource_request_allocations(id, service_provider_id, allocated_quantity, status, service_providers(id, name))')
     .in('delivery_status', ['DELIVERED', 'CANCELLED'])
     .order('fulfilled_at', { ascending: false, nullsFirst: false });
 

@@ -24,6 +24,7 @@ export type ServiceRequestAssignmentStatus =
 
 export type ServiceRequestRecord = {
   id: string;
+  resource_request_id?: string | null;
   wari_id?: string | null;
   halt_id?: string | null;
   request_latitude?: number | null;
@@ -45,6 +46,7 @@ export type ServiceRequestRecord = {
   notes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  allocated_quantity?: number | null;
   waris?: {
     id?: string | null;
     wari_code?: string | null;
@@ -223,27 +225,30 @@ export async function listAvailableResourceRequests(providerId?: string): Promis
     return [];
   }
 
-  let query = supabaseClient
-    .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
+  if (!providerId) return [];
+
+  const { data, error } = await supabaseClient
+    .from('resource_request_allocations')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
+    .eq('service_provider_id', providerId)
     .eq('status', 'PENDING')
-    .eq('delivery_status', 'PENDING')
-    .order('requested_at', { ascending: false });
-
-  if (providerId) {
-    query = query.eq('service_provider_id', providerId);
-  } else {
-    query = query.is('service_provider_id', null);
-  }
-
-  const { data, error } = await query;
+    .order('created_at', { ascending: false });
 
   if (error) {
     logServiceProviderError('listAvailableResourceRequests failed', error);
     throw error;
   }
 
-  return (data ?? []) as ServiceRequestRecord[];
+  return (data ?? []).map((allocation) => ({
+    ...allocation.resource_requests,
+    id: allocation.id,
+    resource_request_id: allocation.resource_request_id,
+    service_provider_id: allocation.service_provider_id,
+    allocated_quantity: allocation.allocated_quantity,
+    delivery_status: allocation.status,
+    accepted_at: allocation.accepted_at,
+    delivered_at: allocation.delivered_at,
+  })) as ServiceRequestRecord[];
 }
 
 export async function acceptResourceRequest(
@@ -257,14 +262,13 @@ export async function acceptResourceRequest(
   const now = new Date().toISOString();
 
   const { data, error } = await supabaseClient
-    .from('resource_requests')
+    .from('resource_request_allocations')
     .update({
-      service_provider_id: providerId,
       accepted_at: now,
-      delivery_status: 'ACCEPTED',
+      status: 'ACCEPTED',
     })
     .eq('id', requestId)
-    .or(`service_provider_id.is.null,service_provider_id.eq.${providerId}`)
+    .eq('service_provider_id', providerId)
     .select()
     .single();
 
@@ -288,12 +292,10 @@ export async function updateDeliveryStatus(
   const statusPayload: Record<string, string | null> =
     deliveryStatus === 'DELIVERED'
       ? {
-          delivery_status: 'DELIVERED',
+          status: 'DELIVERED',
           delivered_at: now,
-          status: 'FULFILLED',
-          fulfilled_at: now,
         }
-      : { delivery_status: deliveryStatus };
+      : { status: deliveryStatus };
 
   if (deliveryStatus === 'CANCELLED') {
     statusPayload.delivered_at = null;
@@ -301,7 +303,7 @@ export async function updateDeliveryStatus(
   }
 
   const { data, error } = await supabaseClient
-    .from('resource_requests')
+    .from('resource_request_allocations')
     .update(statusPayload)
     .eq('id', requestId)
     .select()
@@ -327,10 +329,10 @@ export async function getMyActiveDeliveries(providerId: string): Promise<Service
   }
 
   const { data, error } = await supabaseClient
-    .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
+    .from('resource_request_allocations')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
     .eq('service_provider_id', providerId)
-    .in('delivery_status', ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
+    .in('status', ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
     .order('accepted_at', { ascending: false });
 
   if (error) {
@@ -338,7 +340,7 @@ export async function getMyActiveDeliveries(providerId: string): Promise<Service
     throw error;
   }
 
-  return (data ?? []) as ServiceRequestRecord[];
+  return (data ?? []).map((allocation) => ({ ...allocation.resource_requests, id: allocation.id, resource_request_id: allocation.resource_request_id, service_provider_id: allocation.service_provider_id, allocated_quantity: allocation.allocated_quantity, delivery_status: allocation.status, accepted_at: allocation.accepted_at, delivered_at: allocation.delivered_at })) as ServiceRequestRecord[];
 }
 
 export async function getMyDeliveryHistory(providerId: string): Promise<ServiceRequestRecord[]> {
@@ -347,10 +349,10 @@ export async function getMyDeliveryHistory(providerId: string): Promise<ServiceR
   }
 
   const { data, error } = await supabaseClient
-    .from('resource_requests')
-    .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
+    .from('resource_request_allocations')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
     .eq('service_provider_id', providerId)
-    .in('delivery_status', ['DELIVERED', 'CANCELLED'])
+    .in('status', ['DELIVERED', 'CANCELLED'])
     .order('delivered_at', { ascending: false, nullsFirst: false });
 
   if (error) {
@@ -358,5 +360,5 @@ export async function getMyDeliveryHistory(providerId: string): Promise<ServiceR
     throw error;
   }
 
-  return (data ?? []) as ServiceRequestRecord[];
+  return (data ?? []).map((allocation) => ({ ...allocation.resource_requests, id: allocation.id, resource_request_id: allocation.resource_request_id, service_provider_id: allocation.service_provider_id, allocated_quantity: allocation.allocated_quantity, delivery_status: allocation.status, accepted_at: allocation.accepted_at, delivered_at: allocation.delivered_at })) as ServiceRequestRecord[];
 }
