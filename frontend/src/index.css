@@ -165,12 +165,14 @@ select {
   align-items: center;
   justify-content: center;
   font-family: 'Inter', 'Segoe UI', sans-serif;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background:
+    linear-gradient(135deg, rgba(248, 250, 252, 0.72), rgba(226, 232, 240, 0.48)),
+    url('./assets/dindi/dindi-procession.jpeg') center / cover no-repeat;
   padding: 24px;
 }
 
 .smartvari-root-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 20px;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);

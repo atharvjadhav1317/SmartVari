@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   acceptResourceRequest,
   createServiceProvider,
+  declineResourceRequestAllocation,
   getMyActiveDeliveries,
   getMyDeliveryHistory,
   listAvailableResourceRequests,
@@ -87,6 +88,7 @@ export function ServiceProviderDashboard() {
   const [history, setHistory] = useState<ServiceRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [decliningAllocationId, setDecliningAllocationId] = useState<string | null>(null);
   const [registrationForm, setRegistrationForm] = useState(initialProfile);
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationLocation, setRegistrationLocation] = useState<{ name: string; latitude: number | null; longitude: number | null }>({ name: '', latitude: null, longitude: null });
@@ -307,6 +309,24 @@ export function ServiceProviderDashboard() {
     }
   };
 
+  const handleDeclineRequest = async (allocationId: string) => {
+    if (!selectedProviderId || decliningAllocationId) return;
+
+    setDecliningAllocationId(allocationId);
+    try {
+      const result = await declineResourceRequestAllocation(allocationId, selectedProviderId);
+      setNotice(result && Number(result.remaining_quantity) > 0
+        ? 'Request declined. No replacement provider available for the remaining quantity.'
+        : 'Request declined. Remaining request reassigned.');
+      await loadAll();
+    } catch (error) {
+      console.error('Unable to decline resource request allocation', error);
+      setNotice('Unable to decline request.');
+    } finally {
+      setDecliningAllocationId(null);
+    }
+  };
+
   const handleAdvanceDelivery = async (requestId: string, currentStatus?: string | null) => {
     const nextStatus =
       currentStatus === 'ARRIVED'
@@ -319,7 +339,7 @@ export function ServiceProviderDashboard() {
 
     try {
       console.log('Updating request', { requestId, nextStatus });
-      await updateDeliveryStatus(requestId, nextStatus as 'ACCEPTED' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED');
+      await updateDeliveryStatus(requestId, nextStatus as 'ACCEPTED' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED', selectedProviderId);
       setNotice(`Delivery status updated to ${formatStatus(nextStatus)}.`);
       await loadAll();
     } catch (error) {
@@ -575,8 +595,13 @@ export function ServiceProviderDashboard() {
                       {request.notes && <small className="smartvari-request-note">{request.notes}</small>}
 
                       <div className="smartvari-request-actions">
-                        <button type="button" className="smartvari-danger-btn">
-                          Decline
+                        <button
+                          type="button"
+                          className="smartvari-danger-btn"
+                          disabled={decliningAllocationId === request.id}
+                          onClick={() => void handleDeclineRequest(request.id)}
+                        >
+                          {decliningAllocationId === request.id ? 'Declining...' : 'Decline'}
                         </button>
                         <button
                           type="button"

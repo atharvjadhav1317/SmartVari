@@ -442,7 +442,8 @@ declare
   delivered_count integer;
   active_status text;
 begin
-  select count(*), count(*) filter (where status = 'DELIVERED')
+  select count(*) filter (where status <> 'DECLINED'),
+         count(*) filter (where status <> 'DECLINED' and status = 'DELIVERED')
     into allocation_count, delivered_count
   from public.resource_request_allocations
   where resource_request_id = new.resource_request_id;
@@ -455,6 +456,7 @@ begin
     select status into active_status
     from public.resource_request_allocations
     where resource_request_id = new.resource_request_id
+      and status <> 'DECLINED'
     order by case status when 'IN_TRANSIT' then 1 when 'ARRIVED' then 2 when 'ACCEPTED' then 3 else 4 end
     limit 1;
     update public.resource_requests
@@ -469,6 +471,102 @@ drop trigger if exists sync_resource_request_allocation_status on public.resourc
 create trigger sync_resource_request_allocation_status
 after insert or update of status on public.resource_request_allocations
 for each row execute function public.sync_resource_request_allocation_status();
+
+-- Assigns the unallocated remainder using the same nearest-provider and capacity rules.
+-- The request lock makes decline + reassignment one atomic operation.
+create or replace function public.allocate_resource_request_remaining(p_request_id uuid)
+returns numeric
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  request_row public.resource_requests;
+  provider record;
+  locked_provider public.service_providers;
+  normalized_resource_type text;
+  remaining_quantity numeric;
+  provider_capacity numeric;
+  declared_capacity numeric;
+  used_capacity numeric;
+begin
+  select * into request_row
+  from public.resource_requests
+  where id = p_request_id
+  for update;
+
+  if not found then
+    raise exception 'Resource request not found: %', p_request_id;
+  end if;
+
+  normalized_resource_type := upper(coalesce(request_row.resource_type, 'FOOD'));
+  select greatest(
+    coalesce(request_row.quantity, 0) - coalesce(sum(allocated_quantity) filter (where status <> 'DECLINED'), 0),
+    0
+  ) into remaining_quantity
+  from public.resource_request_allocations
+  where resource_request_id = p_request_id;
+
+  for provider in
+    select provider_row.id,
+      6371 * acos(least(1, greatest(-1,
+        cos(radians(request_row.request_latitude)) * cos(radians(provider_row.latitude)) *
+        cos(radians(provider_row.longitude) - radians(request_row.request_longitude)) +
+        sin(radians(request_row.request_latitude)) * sin(radians(provider_row.latitude))
+      ))) as distance
+    from public.service_providers provider_row
+    where upper(coalesce(provider_row.availability, '')) = 'AVAILABLE'
+      and provider_row.latitude is not null and provider_row.longitude is not null
+      and provider_row.latitude between -90 and 90 and provider_row.longitude between -180 and 180
+      and (normalized_resource_type not in ('FOOD', 'WATER')
+        or (normalized_resource_type = 'FOOD' and coalesce(provider_row.food_capacity, 0) > 0)
+        or (normalized_resource_type = 'WATER' and coalesce(provider_row.water_capacity, 0) > 0))
+      and (upper(coalesce(provider_row.service_type, 'VOLUNTEER')) in ('VOLUNTEER', 'BOTH')
+        or upper(coalesce(provider_row.service_type, '')) = normalized_resource_type)
+      and not exists (
+        select 1 from public.resource_request_allocations declined
+        where declined.resource_request_id = p_request_id
+          and declined.service_provider_id = provider_row.id
+          and declined.status = 'DECLINED'
+      )
+    order by distance, provider_row.id
+  loop
+    exit when remaining_quantity <= 0;
+
+    -- Serialize capacity checks for a provider shared by concurrent requests.
+    select * into locked_provider
+    from public.service_providers
+    where id = provider.id
+    for update;
+
+    declared_capacity := case when normalized_resource_type = 'WATER'
+      then greatest(coalesce(locked_provider.water_capacity, 0), 0)
+      else greatest(coalesce(locked_provider.food_capacity, 0), 0)
+    end;
+    select coalesce(sum(allocated_quantity) filter (where status <> 'DECLINED'), 0)
+      into used_capacity
+    from public.resource_request_allocations
+    where service_provider_id = provider.id;
+    provider_capacity := least(remaining_quantity, greatest(declared_capacity - used_capacity, 0));
+
+    if provider_capacity > 0 then
+      insert into public.resource_request_allocations (resource_request_id, service_provider_id, allocated_quantity)
+      values (p_request_id, provider.id, provider_capacity);
+      remaining_quantity := remaining_quantity - provider_capacity;
+    end if;
+  end loop;
+
+  update public.resource_requests
+  set service_provider_id = (
+    select service_provider_id from public.resource_request_allocations
+    where resource_request_id = p_request_id and status <> 'DECLINED'
+    order by created_at limit 1
+  ), updated_at = now()
+  where id = p_request_id;
+
+  return remaining_quantity;
+end;
+$$;
 
 -- Atomically creates a request and assigns the nearest suitable available provider.
 -- Uses Haversine distance so it does not require PostGIS.
@@ -495,7 +593,6 @@ declare
   normalized_resource_type text := upper(coalesce(p_resource_type, 'FOOD'));
   remaining_quantity numeric := greatest(coalesce(p_quantity, 0), 0);
   provider_capacity numeric;
-  provider record;
 begin
   if p_request_latitude is null or p_request_longitude is null
     or p_request_latitude not between -90 and 90
@@ -513,51 +610,55 @@ begin
     coalesce(p_unit, 'units'), coalesce(p_status, 'PENDING'), 'PENDING', p_notes, now(), now()
   ) returning * into created_request;
 
-  for provider in
-    select provider_row.id,
-           case when normalized_resource_type = 'WATER'
-             then greatest(coalesce(provider_row.water_capacity, 0), 0)
-             else greatest(coalesce(provider_row.food_capacity, 0), 0)
-           end as available_capacity
-    from public.service_providers provider_row
-    where upper(coalesce(provider_row.availability, '')) = 'AVAILABLE'
-      and provider_row.latitude is not null
-      and provider_row.longitude is not null
-      and provider_row.latitude between -90 and 90
-      and provider_row.longitude between -180 and 180
-      and (
-        normalized_resource_type not in ('FOOD', 'WATER')
-        or (normalized_resource_type = 'FOOD' and coalesce(provider_row.food_capacity, 0) > 0)
-        or (normalized_resource_type = 'WATER' and coalesce(provider_row.water_capacity, 0) > 0)
-      )
-      and (
-        upper(coalesce(provider_row.service_type, 'VOLUNTEER')) in ('VOLUNTEER', 'BOTH')
-        or upper(coalesce(provider_row.service_type, '')) = normalized_resource_type
-      )
-    order by 6371 * acos(least(1, greatest(-1,
-      cos(radians(p_request_latitude)) * cos(radians(provider_row.latitude)) *
-      cos(radians(provider_row.longitude) - radians(p_request_longitude)) +
-      sin(radians(p_request_latitude)) * sin(radians(provider_row.latitude))
-    ))), provider_row.id
-  loop
-    exit when remaining_quantity <= 0;
-    provider_capacity := least(remaining_quantity, provider.available_capacity);
-    if provider_capacity > 0 then
-      insert into public.resource_request_allocations (
-        resource_request_id, service_provider_id, allocated_quantity
-      ) values (created_request.id, provider.id, provider_capacity);
-
-      if created_request.service_provider_id is null then
-        update public.resource_requests
-        set service_provider_id = provider.id, updated_at = now()
-        where id = created_request.id
-        returning * into created_request;
-      end if;
-      remaining_quantity := remaining_quantity - provider_capacity;
-    end if;
-  end loop;
+  remaining_quantity := public.allocate_resource_request_remaining(created_request.id);
+  select * into created_request from public.resource_requests where id = created_request.id;
 
   return created_request;
+end;
+$$;
+
+-- Marks only the selected allocation declined, then assigns the request remainder atomically.
+create or replace function public.decline_resource_request_allocation(
+  p_allocation_id uuid,
+  p_provider_id uuid
+)
+returns table (reassigned_quantity numeric, remaining_quantity numeric)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  allocation_row public.resource_request_allocations;
+  before_remaining numeric;
+  after_remaining numeric;
+begin
+  select * into allocation_row
+  from public.resource_request_allocations
+  where id = p_allocation_id and service_provider_id = p_provider_id
+  for update;
+
+  if not found then
+    raise exception 'Allocation not found for this provider';
+  end if;
+  if allocation_row.status <> 'PENDING' then
+    raise exception 'Only pending allocations can be declined';
+  end if;
+
+  select greatest(coalesce(r.quantity, 0) - coalesce(sum(a.allocated_quantity) filter (where a.status <> 'DECLINED'), 0), 0)
+    into before_remaining
+  from public.resource_requests r
+  left join public.resource_request_allocations a on a.resource_request_id = r.id
+  where r.id = allocation_row.resource_request_id
+  group by r.quantity;
+
+  update public.resource_request_allocations
+  set status = 'DECLINED', updated_at = now()
+  where id = p_allocation_id and service_provider_id = p_provider_id;
+
+  after_remaining := public.allocate_resource_request_remaining(allocation_row.resource_request_id);
+  reassigned_quantity := greatest(before_remaining - after_remaining, 0);
+  remaining_quantity := after_remaining;
+  return next;
 end;
 $$;
 

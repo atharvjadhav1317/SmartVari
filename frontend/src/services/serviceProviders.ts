@@ -284,11 +284,35 @@ export async function acceptResourceRequest(
   return (data ?? null) as ServiceRequestRecord | null;
 }
 
+/** Declines this provider's allocation and atomically assigns any remainder elsewhere. */
+export async function declineResourceRequestAllocation(
+  allocationId: string,
+  providerId: string,
+): Promise<{ reassigned_quantity: number; remaining_quantity: number } | null> {
+  if (!supabaseClient || !hasSupabaseConfig || !allocationId.trim() || !providerId.trim()) {
+    return null;
+  }
+
+  const { data, error } = await supabaseClient.rpc('decline_resource_request_allocation', {
+    p_allocation_id: allocationId,
+    p_provider_id: providerId,
+  });
+
+  if (error) {
+    logServiceProviderError('declineResourceRequestAllocation failed', error);
+    throw error;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  return (result ?? null) as { reassigned_quantity: number; remaining_quantity: number } | null;
+}
+
 export async function updateDeliveryStatus(
-  requestId: string,
+  allocationId: string,
   deliveryStatus: ServiceRequestAssignmentStatus,
+  providerId?: string,
 ): Promise<ServiceRequestRecord | null> {
-  if (!supabaseClient || !hasSupabaseConfig || !requestId.trim()) {
+  if (!supabaseClient || !hasSupabaseConfig || !allocationId.trim()) {
     return null;
   }
 
@@ -306,12 +330,14 @@ export async function updateDeliveryStatus(
     statusPayload.status = 'CANCELLED';
   }
 
-  const { data, error } = await supabaseClient
+  let updateQuery = supabaseClient
     .from('resource_request_allocations')
     .update(statusPayload)
-    .eq('id', requestId)
-    .select()
-    .single();
+    .eq('id', allocationId);
+  if (providerId?.trim()) {
+    updateQuery = updateQuery.eq('service_provider_id', providerId);
+  }
+  const { data, error } = await updateQuery.select().single();
 
   if (error) {
     console.error('UPDATE DELIVERY ERROR', {
