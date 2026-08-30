@@ -89,7 +89,8 @@ export function ServiceProviderDashboard() {
   const [notice, setNotice] = useState('');
   const [registrationForm, setRegistrationForm] = useState(initialProfile);
   const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [registrationLocation, setRegistrationLocation] = useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null });
+  const [registrationLocation, setRegistrationLocation] = useState<{ name: string; latitude: number | null; longitude: number | null }>({ name: '', latitude: null, longitude: null });
+  const [locationMode, setLocationMode] = useState<'GPS' | 'CUSTOM'>('GPS');
   const [locationStatus, setLocationStatus] = useState('Location not set');
   const [locationError, setLocationError] = useState('');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -196,13 +197,13 @@ export function ServiceProviderDashboard() {
     setLocationStatus('Detecting location...');
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        setRegistrationLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        setRegistrationLocation({ name: 'Current device location', latitude: coords.latitude, longitude: coords.longitude });
         setLocationStatus('Location detected');
         setIsDetectingLocation(false);
       },
       (error) => {
         const message = error.code === error.PERMISSION_DENIED
-          ? 'Location permission was denied. Allow location access in your browser and try again.'
+          ? 'Location permission denied. You can enter a custom location instead.'
           : error.code === error.POSITION_UNAVAILABLE
             ? 'Your location could not be determined. Check your device location settings and try again.'
             : 'Location request timed out. Please try again.';
@@ -224,12 +225,14 @@ export function ServiceProviderDashboard() {
 
     const foodCapacity = Number(registrationForm.foodCapacity);
     const waterCapacity = Number(registrationForm.waterCapacity);
+    const registrationLatitude = Number(registrationLocation.latitude);
+    const registrationLongitude = Number(registrationLocation.longitude);
     if (!Number.isFinite(foodCapacity) || foodCapacity < 0 || !Number.isFinite(waterCapacity) || waterCapacity < 0) {
       setNotice('Food and water capacities must be numbers greater than or equal to zero.');
       return;
     }
 
-    if (registrationLocation.latitude === null || registrationLocation.longitude === null) {
+    if (registrationLocation.latitude === null || registrationLocation.longitude === null || !Number.isFinite(registrationLatitude) || !Number.isFinite(registrationLongitude) || registrationLatitude < -90 || registrationLatitude > 90 || registrationLongitude < -180 || registrationLongitude > 180) {
       setNotice('Please set your current location before registering.');
       locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
@@ -241,8 +244,8 @@ export function ServiceProviderDashboard() {
         phone: registrationForm.phone || null,
         service_type: registrationForm.serviceType || 'VOLUNTEER',
         availability: registrationForm.availability,
-        latitude: registrationLocation.latitude,
-        longitude: registrationLocation.longitude,
+        latitude: registrationLatitude,
+        longitude: registrationLongitude,
         food_capacity: foodCapacity,
         water_capacity: waterCapacity,
       });
@@ -251,7 +254,8 @@ export function ServiceProviderDashboard() {
       setSelectedProviderId(created.id || '');
       setOnline(true);
       setRegistrationForm(initialProfile);
-      setRegistrationLocation({ latitude: null, longitude: null });
+      setRegistrationLocation({ name: '', latitude: null, longitude: null });
+      setLocationMode('GPS');
       setLocationStatus('Location not set');
       setLocationError('');
       setRegistrationOpen(false);
@@ -415,6 +419,11 @@ export function ServiceProviderDashboard() {
                     <button className="smartvari-muted-btn" type="button" onClick={handleUpdateLocation}>
                       Update location
                     </button>
+                  </div>
+
+                  <div className="smartvari-provider-location-summary">
+                    <strong>Location</strong>
+                    {provider.latitude != null && provider.longitude != null ? <span>{Number(provider.latitude).toFixed(6)}, {Number(provider.longitude).toFixed(6)}</span> : <span>Location not set</span>}
                   </div>
 
                   <div className="smartvari-stat-grid">
@@ -706,9 +715,17 @@ export function ServiceProviderDashboard() {
               <label className="smartvari-form-field">Availability<select value={registrationForm.availability} onChange={(event) => setRegistrationForm((current) => ({ ...current, availability: event.target.value }))}><option value="AVAILABLE">Available</option><option value="BUSY">Busy</option><option value="OFFLINE">Offline</option></select></label>
               <div className="smartvari-form-field" ref={locationSectionRef}>
                 <span>Location</span>
-                <button className="smartvari-primary-btn" type="button" onClick={handleDetectRegistrationLocation} disabled={isDetectingLocation}>
-                  {isDetectingLocation ? 'Detecting location...' : 'Use current location'}
-                </button>
+                <div className="smartvari-location-actions">
+                  <button className={locationMode === 'GPS' ? 'smartvari-primary-btn' : 'smartvari-secondary-btn'} type="button" onClick={() => setLocationMode('GPS')}>Use current location</button>
+                  <button className={locationMode === 'CUSTOM' ? 'smartvari-primary-btn' : 'smartvari-secondary-btn'} type="button" onClick={() => { setLocationMode('CUSTOM'); setLocationError(''); setRegistrationLocation((current) => ({ ...current, name: '', latitude: null, longitude: null })); }}>Enter custom location</button>
+                </div>
+                {locationMode === 'GPS' ? <button className="smartvari-secondary-btn" type="button" onClick={handleDetectRegistrationLocation} disabled={isDetectingLocation}>{isDetectingLocation ? 'Detecting location...' : 'Detect current location'}</button> : (
+                  <>
+                    <input placeholder="Location name (optional)" value={registrationLocation.name} onChange={(event) => setRegistrationLocation((current) => ({ ...current, name: event.target.value }))} />
+                    <input type="number" step="any" min="-90" max="90" placeholder="Latitude" value={registrationLocation.latitude ?? ''} onChange={(event) => setRegistrationLocation((current) => ({ ...current, latitude: event.target.value === '' ? null : Number(event.target.value) }))} />
+                    <input type="number" step="any" min="-180" max="180" placeholder="Longitude" value={registrationLocation.longitude ?? ''} onChange={(event) => setRegistrationLocation((current) => ({ ...current, longitude: event.target.value === '' ? null : Number(event.target.value) }))} />
+                  </>
+                )}
                 <small className={locationError ? 'smartvari-location-error' : 'smartvari-location-status'}>
                   {locationError || (registrationLocation.latitude !== null && registrationLocation.longitude !== null
                     ? `✓ ${locationStatus} · ${registrationLocation.latitude.toFixed(8)}, ${registrationLocation.longitude.toFixed(8)}`

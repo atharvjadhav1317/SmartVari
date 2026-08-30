@@ -12,6 +12,8 @@ import {
 } from '../../features/live-wari/services/resourceRequests';
 import { fetchRoadRoute } from '../../features/live-wari/services/routing';
 import { RouteSetupPage } from '../../features/live-wari/pages/RouteSetupPage';
+import { LiveMap } from '../../features/live-wari/components/LiveMap';
+import { listServiceProviders } from '../../services/serviceProviders';
 
 const emptyRegistration = () => ({
   wari_code: '',
@@ -56,6 +58,12 @@ const deliveryStatusFor = (request) => request.delivery_status || (request.statu
 const formatRequestDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Date not set';
 const formatRequestTime = (value) => value ? new Date(`1970-01-01T${value}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time not set';
 const formatTimestamp = (value) => value ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+const mapGeometryPoints = (geometry) => {
+  const coordinates = Array.isArray(geometry) ? geometry : geometry?.coordinates;
+  if (!Array.isArray(coordinates)) return [];
+  return coordinates.map((point) => Array.isArray(point) ? { lat: Number(point[0]), lng: Number(point[1]) } : null)
+    .filter((point) => point && Number.isFinite(point.lat) && point.lat >= -90 && point.lat <= 90 && Number.isFinite(point.lng) && point.lng >= -180 && point.lng <= 180);
+};
 
 async function geocodePlace(query) {
   const clean = String(query || '').trim();
@@ -98,6 +106,7 @@ export default function DindiLeaderDashboard() {
   const [selectedWari, setSelectedWari] = useState(null);
   const [route, setRoute] = useState(null);
   const [halts, setHalts] = useState([]);
+  const [providerLocations, setProviderLocations] = useState([]);
   const [liveRequests, setLiveRequests] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +146,7 @@ export default function DindiLeaderDashboard() {
     if (!wariId) {
       setRoute(null);
       setHalts([]);
+      setProviderLocations([]);
       setLiveRequests([]);
       setHistory([]);
       return;
@@ -146,17 +156,21 @@ export default function DindiLeaderDashboard() {
     setHaltsLoading(true);
 
     try {
-      const [routeRecord, haltRows, activeRows, historyRows] = await Promise.all([
+      const [routeRecord, haltRows, activeRows, historyRows, providers] = await Promise.all([
         getRouteByWariId(wariId),
         getWariHalts(wariId),
         listLiveResourceRequests(wariId),
         listResourceRequestHistory(wariId),
+        listServiceProviders(),
       ]);
 
       setRoute(routeRecord);
       setHalts(haltRows || []);
       setLiveRequests(activeRows || []);
       setHistory(historyRows || []);
+      setProviderLocations((providers || []).filter((provider) => Number.isFinite(Number(provider.latitude)) && Number(provider.latitude) >= -90 && Number(provider.latitude) <= 90 && Number.isFinite(Number(provider.longitude)) && Number(provider.longitude) >= -180 && Number(provider.longitude) <= 180).map((provider) => ({
+        lat: Number(provider.latitude), lng: Number(provider.longitude), name: provider.name, serviceType: provider.service_type, availability: provider.availability, foodCapacity: provider.food_capacity, waterCapacity: provider.water_capacity,
+      })));
     } catch (loadError) {
       console.error('Unable to load Dindi dashboard data', loadError);
       setError(loadError?.message || 'Unable to load dashboard data.');
@@ -735,6 +749,18 @@ export default function DindiLeaderDashboard() {
             {liveLocationError && <div className="inline-error">{liveLocationError}</div>}
           </section>
         ) : null}
+
+        <section className="card dindi-live-map-card">
+          <div className="card-head"><h3>Live Wari map</h3><span className="micro-label">● Wari&nbsp;&nbsp; ● Provider&nbsp;&nbsp; ● Halt&nbsp;&nbsp; ● Food&nbsp;&nbsp; ● Water&nbsp;&nbsp; ● Destination</span></div>
+          <LiveMap
+            currentPosition={selectedWari?.current_lat != null && selectedWari?.current_lng != null ? { lat: Number(selectedWari.current_lat), lng: Number(selectedWari.current_lng) } : null}
+            sourcePosition={route?.source_lat != null && route?.source_lng != null ? { lat: Number(route.source_lat), lng: Number(route.source_lng) } : null}
+            destinationPosition={route?.destination_lat != null && route?.destination_lng != null ? { lat: Number(route.destination_lat), lng: Number(route.destination_lng) } : null}
+            routePoints={mapGeometryPoints(route?.road_geometry)}
+            halts={halts.map((halt) => ({ lat: Number(halt.latitude), lng: Number(halt.longitude), name: halt.halt_name, day: halt.day_number, sequence: halt.sequence_order, type: halt.halt_type }))}
+            providerLocations={providerLocations}
+          />
+        </section>
 
         <section className="content-grid">
           <div className="stack-column">

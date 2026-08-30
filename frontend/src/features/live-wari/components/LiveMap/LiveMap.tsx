@@ -16,6 +16,7 @@ export type LiveMapProps = {
   routePoints?: LiveMapPoint[];
   halts?: Array<LiveMapPoint & { name: string; day: number; sequence: number; type: string; arrival?: string | null; departure?: string | null }>;
   supportLocations?: Array<LiveMapPoint & { type: 'FOOD' | 'WATER'; label?: string }>;
+  providerLocations?: Array<LiveMapPoint & { name: string; serviceType?: string | null; availability?: string | null; foodCapacity?: number | null; waterCapacity?: number | null }>;
 };
 
 const createMarkerIcon = (color: string) =>
@@ -59,9 +60,10 @@ export function LiveMap({
   routePoints,
   halts = [],
   supportLocations = [],
+  providerLocations = [],
 }: LiveMapProps) {
   const routeCoordinates = (routePoints ?? []).map((point) => [point.lat, point.lng] as [number, number]);
-  const markerPoints = [sourcePosition, destinationPosition, currentPosition, ...halts, ...supportLocations]
+  const markerPoints = [sourcePosition, destinationPosition, currentPosition, ...halts, ...supportLocations, ...providerLocations]
     .filter((point): point is LiveMapPoint => Boolean(point))
     .map((point) => [point.lat, point.lng] as [number, number]);
   const center = currentPosition ?? sourcePosition ?? destinationPosition ?? { lat: 20.5937, lng: 78.9629 };
@@ -79,6 +81,7 @@ export function LiveMap({
         {destinationPosition ? <Marker position={[destinationPosition.lat, destinationPosition.lng]} icon={createMarkerIcon('#475569')}><Popup>Destination</Popup></Marker> : null}
         {halts.map((halt) => <Marker key={`halt-${halt.name}-${halt.sequence}`} position={[halt.lat, halt.lng]} icon={createMarkerIcon('#a855f7')}><Popup><strong>{halt.name}</strong><br />Day {halt.day} · Stop {halt.sequence}<br />{halt.type}{halt.arrival ? <><br />Arrival: {halt.arrival}</> : null}{halt.departure ? <><br />Departure: {halt.departure}</> : null}</Popup></Marker>)}
         {supportLocations.map((location, index) => <CircleMarker key={`support-${location.type}-${location.lat}-${location.lng}-${index}`} center={[location.lat, location.lng]} radius={7} pathOptions={{ color: location.type === 'FOOD' ? '#f97316' : '#06b6d4', fillColor: location.type === 'FOOD' ? '#fb923c' : '#22d3ee', fillOpacity: 0.85 }}><Popup>{location.type === 'FOOD' ? 'Food support' : 'Water support'}{location.label ? <><br />{location.label}</> : null}</Popup></CircleMarker>)}
+        {providerLocations.map((provider) => <Marker key={`provider-${provider.name}-${provider.lat}-${provider.lng}`} position={[provider.lat, provider.lng]} icon={createMarkerIcon('#7c3aed')}><Popup><strong>{provider.name}</strong><br />{provider.serviceType || 'Service Provider'}<br />Food: {Number(provider.foodCapacity) > 0 ? `${provider.foodCapacity} packets` : 'Not available'}<br />Water: {Number(provider.waterCapacity) > 0 ? `${provider.waterCapacity} litres` : 'Not available'}<br />Status: {provider.availability || 'Unknown'}<br />📍 {provider.lat.toFixed(6)}, {provider.lng.toFixed(6)}</Popup></Marker>)}
         {routeCoordinates.length > 1 ? <Polyline positions={routeCoordinates} color="#0ea5e9" weight={5} opacity={0.85} /> : null}
         <FitMapToPoints points={routeCoordinates.length > 1 ? routeCoordinates : markerPoints} />
       </MapContainer>
