@@ -567,6 +567,7 @@ export default function DindiLeaderDashboard() {
         wariName={routeSetupWari.name}
         source={routeSetupWari.source}
         destination={routeSetupWari.destination}
+        onBack={() => setRouteSetupWari(null)}
         onComplete={() => {
           setRouteSetupWari(null);
           void loadDashboardData(routeSetupWari.id);
@@ -751,7 +752,7 @@ export default function DindiLeaderDashboard() {
         ) : null}
 
         <section className="card dindi-live-map-card">
-          <div className="card-head"><h3>Live Wari map</h3><span className="micro-label">● Wari&nbsp;&nbsp; ● Provider&nbsp;&nbsp; ● Halt&nbsp;&nbsp; ● Food&nbsp;&nbsp; ● Water&nbsp;&nbsp; ● Destination</span></div>
+          <div className="card-head"><h3>Live Wari map</h3><span className="micro-label">● Wari&nbsp;&nbsp; ● Food Provider&nbsp;&nbsp; ● Water Provider&nbsp;&nbsp; ● Food + Water Provider&nbsp;&nbsp; ● Halt&nbsp;&nbsp; ● Destination</span></div>
           <LiveMap
             currentPosition={selectedWari?.current_lat != null && selectedWari?.current_lng != null ? { lat: Number(selectedWari.current_lat), lng: Number(selectedWari.current_lng) } : null}
             sourcePosition={route?.source_lat != null && route?.source_lng != null ? { lat: Number(route.source_lat), lng: Number(route.source_lng) } : null}

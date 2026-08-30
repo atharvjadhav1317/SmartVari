@@ -70,6 +70,48 @@ alter table public.wari_routes add column if not exists estimated_duration_min d
 alter table public.wari_routes add column if not exists created_at timestamptz default now();
 alter table public.wari_routes add column if not exists updated_at timestamptz default now();
 
+-- SmartVari stores one active route per Wari. Add the conflict target required by
+-- saveRoute(). If legacy duplicates exist, retain the most complete/latest row
+-- for each Wari and remove only obsolete duplicate route rows.
+do $$
+declare
+  duplicate record;
+begin
+  for duplicate in
+    select wari_id
+    from public.wari_routes
+    where wari_id is not null
+    group by wari_id
+    having count(*) > 1
+  loop
+    delete from public.wari_routes route
+    where route.wari_id = duplicate.wari_id
+      and route.id not in (
+        select candidate.id
+        from public.wari_routes candidate
+        where candidate.wari_id = duplicate.wari_id
+        order by
+          (case when candidate.road_geometry is not null then 1 else 0 end
+           + case when candidate.route_points is not null and candidate.route_points <> '[]'::jsonb then 1 else 0 end
+           + case when candidate.source_lat is not null and candidate.destination_lat is not null then 1 else 0 end) desc,
+          candidate.updated_at desc nulls last,
+          candidate.created_at desc nulls last,
+          candidate.id desc
+        offset 1
+      );
+  end loop;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.wari_routes'::regclass
+      and contype = 'u'
+      and conkey = array[(select attnum from pg_attribute where attrelid = 'public.wari_routes'::regclass and attname = 'wari_id')::smallint]
+  ) then
+    alter table public.wari_routes add constraint wari_routes_wari_id_key unique (wari_id);
+  end if;
+end $$;
+
 -- 3) Create helper tables only when absent.
 create table if not exists public.wari_halts (
   id uuid primary key default gen_random_uuid(),
