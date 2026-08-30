@@ -102,6 +102,7 @@ const normalizeStatus = (value: string | null | undefined): WariSearchResult['st
 };
 
 export const mapWariToSearchResult = (record: WariRecord): WariSearchResult => ({
+  recordId: record.id,
   wariId: normalizeText(record.wari_code) || record.id,
   wariName: normalizeText(record.name) || 'SmartVari Wari',
   source: normalizeText(record.source) || 'Unknown source',

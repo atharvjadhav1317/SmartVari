@@ -1,118 +1,46 @@
-import { LiveMap } from '../../components/LiveMap';
+import { useEffect, useMemo, useState } from 'react';
+import { LiveMap, type LiveMapPoint } from '../../components/LiveMap';
 import { TrackingStatusCard } from '../../components/TrackingStatusCard';
+import { getRouteByWariId, type WariRouteRecord } from '../../services/routes';
+import { getWariById } from '../../services/wari';
+import { getWariHalts, type WariHalt } from '../../services/halts';
+import { listLiveResourceRequests, type ResourceRequest } from '../../services/resourceRequests';
+import { fetchRoadRoute, geocodePlace } from '../../services/routing';
 
-type SelectedWari = {
-  wariId: string;
-  wariName: string;
-  source: string;
-  destination: string;
-  status: string;
-  lastUpdated: string;
-  currentArea: string;
-  currentLat?: number | null;
-  currentLng?: number | null;
-};
+type SelectedWari = { recordId?: string; wariId: string; wariName: string; source: string; destination: string; status: string; lastUpdated: string; currentArea: string; currentLat?: number | null; currentLng?: number | null };
+type TrackingPageProps = { selectedWari?: SelectedWari; wariId?: string; source?: string; destination?: string; currentArea?: string; currentStatus?: string; lastUpdated?: string; onBack?: () => void };
+type RouteState = { source: LiveMapPoint; destination: LiveMapPoint; points: LiveMapPoint[]; distanceKm: number | null; durationMin: number | null };
+type HaltMarker = LiveMapPoint & { name: string; day: number; sequence: number; type: string; arrival?: string | null; departure?: string | null };
+type SupportMarker = LiveMapPoint & { type: 'FOOD' | 'WATER'; label?: string };
 
-type TrackingPageProps = {
-  selectedWari?: SelectedWari;
-  wariId?: string;
-  source?: string;
-  destination?: string;
-  currentArea?: string;
-  currentStatus?: string;
-  lastUpdated?: string;
-  onBack?: () => void;
-};
+const toPoint = (lat: unknown, lng: unknown): LiveMapPoint | null => { const latitude = Number(lat); const longitude = Number(lng); return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? { lat: latitude, lng: longitude } : null; };
+const geometryPoints = (geometry: unknown): LiveMapPoint[] => { const coordinates = Array.isArray(geometry) ? geometry : (geometry as { coordinates?: unknown[] } | null)?.coordinates; if (!Array.isArray(coordinates)) return []; return coordinates.map((item) => { if (!Array.isArray(item)) return null; const first = Number(item[0]); const second = Number(item[1]); return Math.abs(first) <= 90 ? toPoint(first, second) : toPoint(second, first); }).filter((point): point is LiveMapPoint => Boolean(point)); };
+const progressFor = (position: LiveMapPoint | null, points: LiveMapPoint[]) => { if (!position || points.length < 2) return null; let index = 0; let best = Infinity; points.forEach((point, pointIndex) => { const distance = (point.lat - position.lat) ** 2 + (point.lng - position.lng) ** 2; if (distance < best) { best = distance; index = pointIndex; } }); return Math.round((index / (points.length - 1)) * 100); };
+const asHaltMarkers = (halts: WariHalt[]): HaltMarker[] => halts.map((halt) => ({ lat: halt.latitude, lng: halt.longitude, name: halt.halt_name, day: halt.day_number, sequence: halt.sequence_order, type: halt.halt_type, arrival: halt.arrival_time, departure: halt.departure_time }));
 
-export function TrackingPage({
-  selectedWari,
-  wariId = selectedWari?.wariId ?? 'SW-DEMO-001',
-  source = selectedWari?.source ?? 'Demo Origin',
-  destination = selectedWari?.destination ?? 'Demo Destination',
-  currentArea = selectedWari?.currentArea ?? 'Demo Location',
-  currentStatus = selectedWari?.status ?? 'On Route',
-  lastUpdated = selectedWari?.lastUpdated ?? '30 sec ago',
-  onBack,
-}: TrackingPageProps) {
-  const sourcePosition = { lat: 18.5204, lng: 73.8567 };
-  const destinationPosition = { lat: 18.5361, lng: 73.8795 };
-
-  const hasCurrentCoordinates =
-    selectedWari?.currentLat != null && selectedWari?.currentLng != null;
-
-  const currentPosition = hasCurrentCoordinates
-    ? { lat: selectedWari.currentLat as number, lng: selectedWari.currentLng as number }
-    : { lat: 18.5293, lng: 73.8688 };
-
-  const routePoints = [
-    sourcePosition,
-    { lat: 18.5229, lng: 73.8604 },
-    currentPosition,
-    { lat: 18.5328, lng: 73.8737 },
-    destinationPosition,
-  ];
-
-  return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-sky-100"
-            >
-              ← Back
-            </button>
-
-            <div className="flex items-center gap-3 text-right">
-              <span className="text-sm font-medium text-slate-500">Wari</span>
-              <span className="text-lg font-semibold text-slate-900">{wariId}</span>
-            </div>
-
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-              LIVE
-            </span>
-          </div>
-        </header>
-
-        <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
-          {!hasCurrentCoordinates ? (
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
-              Location unavailable for this Wari.
-            </div>
-          ) : null}
-
-          <div className="p-3 sm:p-4">
-            <LiveMap
-              currentPosition={currentPosition}
-              sourcePosition={sourcePosition}
-              destinationPosition={destinationPosition}
-              routePoints={routePoints}
-            />
-          </div>
-
-          <div className="space-y-5 p-4 sm:p-6">
-            <TrackingStatusCard
-              wariId={wariId}
-              source={source}
-              destination={destination}
-              currentArea={currentArea}
-              currentStatus={currentStatus}
-              lastUpdated={lastUpdated}
-            />
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Journey</p>
-              <p className="mt-2 text-base font-medium text-slate-800">
-                {source} → {currentArea} → {destination}
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+export function TrackingPage({ selectedWari: selectedInput, wariId, source, destination, currentArea, currentStatus, lastUpdated, onBack }: TrackingPageProps) {
+  const selectedWari = selectedInput ?? { wariId: wariId ?? '', wariName: wariId ?? 'Wari', source: source ?? '', destination: destination ?? '', status: currentStatus ?? 'On Route', lastUpdated: lastUpdated ?? 'Recently', currentArea: currentArea ?? '' };
+  const [liveWari, setLiveWari] = useState(selectedWari);
+  const [route, setRoute] = useState<RouteState | null>(null); const [routeMeta, setRouteMeta] = useState<WariRouteRecord | null>(null); const [halts, setHalts] = useState<WariHalt[]>([]); const [requests, setRequests] = useState<ResourceRequest[]>([]); const [loading, setLoading] = useState(true); const [routeError, setRouteError] = useState('');
+  useEffect(() => {
+    const id = selectedWari.recordId || selectedWari.wariId;
+    if (!id) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const next = await getWariById(id);
+        if (!cancelled && next) setLiveWari((current) => ({ ...current, currentLat: next.current_lat, currentLng: next.current_lng, currentArea: next.current_area || '', lastUpdated: next.last_updated || current.lastUpdated }));
+      } catch (error) { console.error('Unable to refresh live Wari location', error); }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 10000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [selectedWari.recordId, selectedWari.wariId]);
+  useEffect(() => { let cancelled = false; const load = async () => { if (!selectedWari) return; setLoading(true); setRouteError(''); try { const id = selectedWari.recordId || selectedWari.wariId; const [stored, loadedHalts, loadedRequests] = await Promise.all([getRouteByWariId(id), getWariHalts(id), listLiveResourceRequests(id)]); if (cancelled) return; setRouteMeta(stored); setHalts(loadedHalts); setRequests(loadedRequests); let source = toPoint(stored?.source_lat, stored?.source_lng); let destination = toPoint(stored?.destination_lat, stored?.destination_lng); if (!source) source = await geocodePlace(selectedWari.source); if (!destination) destination = await geocodePlace(selectedWari.destination); const storedPoints = geometryPoints(stored?.road_geometry); if (storedPoints.length > 1) { setRoute({ source, destination, points: storedPoints, distanceKm: Number(stored?.total_distance_km) || null, durationMin: Number(stored?.estimated_duration_min) || null }); } else { const road = await fetchRoadRoute([source, destination]); if (!cancelled) setRoute({ source, destination, points: road.geometry.map(([lat, lng]) => ({ lat, lng })), distanceKm: road.distance / 1000, durationMin: road.duration / 60 }); } } catch (error) { console.error('Unable to load OSRM road route', error); if (!cancelled) setRouteError('Unable to load road route.'); } finally { if (!cancelled) setLoading(false); } }; void load(); return () => { cancelled = true; }; }, [selectedWari]);
+  const currentPosition = useMemo(() => toPoint(liveWari?.currentLat, liveWari?.currentLng), [liveWari]);
+  const supportLocations = requests.map((request): SupportMarker | null => { const point = toPoint(request.request_latitude, request.request_longitude); return point && (request.resource_type === 'FOOD' || request.resource_type === 'WATER') ? { ...point, type: request.resource_type, label: `${request.quantity} ${request.unit}` } : null; }).filter((point): point is SupportMarker => Boolean(point));
+  if (!selectedWari) return null;
+  const progress = progressFor(currentPosition, route?.points ?? []);
+  return <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl"><header className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><div className="flex items-center justify-between gap-3"><button type="button" onClick={onBack} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">← Back</button><div className="text-right"><p className="text-sm font-medium text-slate-500">{selectedWari.wariName}</p><span className="text-lg font-semibold">{selectedWari.wariId}</span></div><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">LIVE</span></div></header><section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.08)]">{loading ? <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">Calculating road route...</div> : null}{routeError ? <div className="border-b border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{routeError}</div> : null}{!currentPosition ? <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">Location unavailable for this Wari.</div> : null}<div className="p-3 sm:p-4"><LiveMap currentPosition={currentPosition} sourcePosition={route?.source} destinationPosition={route?.destination} routePoints={route?.points} halts={asHaltMarkers(halts)} supportLocations={supportLocations} /></div><div className="space-y-5 p-4 sm:p-6"><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">{selectedWari.source} → {selectedWari.destination}</p><div className="mt-3 grid gap-3 text-sm text-slate-600 sm:grid-cols-3"><span>{route?.distanceKm != null ? `${route.distanceKm.toFixed(1)} km` : 'Distance unavailable'}</span><span>{route?.durationMin != null ? `~${Math.round(route.durationMin / 60)} hr` : 'Duration unavailable'}</span><span>{progress != null ? `${progress}% route completed` : 'Progress unavailable'}</span></div><p className="mt-3 text-sm text-slate-600">Current: {liveWari.currentArea || 'Location unavailable'} · Updated {liveWari.lastUpdated}</p></div><TrackingStatusCard wariId={selectedWari.wariId} source={selectedWari.source} destination={selectedWari.destination} currentArea={liveWari.currentArea} currentStatus={selectedWari.status as never} lastUpdated={liveWari.lastUpdated} /><div className="flex flex-wrap gap-3 text-xs text-slate-600"><span>● Wari</span><span>● Start</span><span>● Destination</span><span>● Halt</span><span>● Food</span><span>● Water</span></div>{routeMeta ? <p className="text-xs text-slate-400">Road route loaded from saved route data.</p> : null}</div></section></div></main>;
 }
-
 export default TrackingPage;

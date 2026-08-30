@@ -536,6 +536,21 @@
   color: #9a4d00;
 }
 
+.smartvari-wari-location-card {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #dce7f5;
+  border-radius: 16px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 0.82rem;
+}
+
+.smartvari-wari-location-card strong { color: #0f172a; }
+.smartvari-wari-location-card small { color: #64748b; }
+
 .smartvari-modal-backdrop {
   position: fixed;
   inset: 0;

@@ -1,6 +1,7 @@
 import { WariSummaryCard, type WariSummaryCardStatus } from '../WariSummaryCard';
 
 export type WariSearchResult = {
+  recordId?: string;
   wariId: string;
   wariName: string;
   source: string;

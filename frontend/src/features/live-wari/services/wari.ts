@@ -14,6 +14,10 @@ export type WariRecord = {
   organizer_contact?: string | null;
   description?: string | null;
   status?: WariStatus | string | null;
+  current_lat?: number | null;
+  current_lng?: number | null;
+  current_area?: string | null;
+  last_updated?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -133,5 +137,19 @@ export async function updateWari(wariId: string, updates: Partial<CreateWariInpu
     throw error;
   }
 
+  return (data ?? null) as WariRecord | null;
+}
+
+export async function updateWariLocation(wariId: string, latitude: number, longitude: number): Promise<WariRecord | null> {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error('Invalid Wari location coordinates');
+  }
+  if (!supabaseClient || !hasSupabaseConfig || !wariId.trim()) return null;
+  const { data, error } = await supabaseClient.from('waris').update({
+    current_lat: latitude,
+    current_lng: longitude,
+    last_updated: new Date().toISOString(),
+  }).eq('id', wariId).select().single();
+  if (error) throw error;
   return (data ?? null) as WariRecord | null;
 }

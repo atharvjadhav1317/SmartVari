@@ -11,6 +11,18 @@ export type RoadRouteResult = {
   geometry: Array<[number, number]>;
 };
 
+export async function geocodePlace(query: string): Promise<RoutePoint> {
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(`Geocoding failed with status ${response.status}`);
+  const result = (await response.json())?.[0];
+  const lat = Number(result?.lat);
+  const lng = Number(result?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) throw new Error(`Unable to locate ${query}`);
+  return { lat, lng };
+}
+
 const decodePolyline = (encoded: string): Array<[number, number]> => {
   const coordinates: Array<[number, number]> = [];
   let index = 0;

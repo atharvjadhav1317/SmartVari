@@ -1,6 +1,6 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { listWaris, createWari } from '../../features/live-wari/services/wari';
+import { listWaris, createWari, updateWariLocation } from '../../features/live-wari/services/wari';
 import { getRouteByWariId, saveRoute } from '../../features/live-wari/services/routes';
 import { getWariHalts, createWariHalts } from '../../features/live-wari/services/halts';
 import {
@@ -11,6 +11,7 @@ import {
   subscribeToResourceRequestChanges,
 } from '../../features/live-wari/services/resourceRequests';
 import { fetchRoadRoute } from '../../features/live-wari/services/routing';
+import { RouteSetupPage } from '../../features/live-wari/pages/RouteSetupPage';
 
 const emptyRegistration = () => ({
   wari_code: '',
@@ -107,6 +108,7 @@ export default function DindiLeaderDashboard() {
   const [registerForm, setRegisterForm] = useState(emptyRegistration());
   const [registerError, setRegisterError] = useState('');
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [routeSetupWari, setRouteSetupWari] = useState(null);
   const [haltDraft, setHaltDraft] = useState(emptyHalt());
   const [haltError, setHaltError] = useState('');
   const [haltLoading, setHaltLoading] = useState(false);
@@ -124,6 +126,10 @@ export default function DindiLeaderDashboard() {
   });
   const [requestError, setRequestError] = useState('');
   const [requestLoading, setRequestLoading] = useState(false);
+  const [isLiveLocationActive, setIsLiveLocationActive] = useState(false);
+  const [liveLocationMessage, setLiveLocationMessage] = useState('Location tracking off');
+  const [liveLocationError, setLiveLocationError] = useState('');
+  const locationWatchRef = useRef(null);
 
   const selectedWariName = selectedWari?.name || 'Selected Wari';
 
@@ -202,6 +208,61 @@ export default function DindiLeaderDashboard() {
     loadDashboardData(selectedWariId);
   }, [selectedWariId, waris]);
 
+  useEffect(() => () => {
+    if (locationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (locationWatchRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(locationWatchRef.current);
+        locationWatchRef.current = null;
+      }
+      setIsLiveLocationActive(false);
+    };
+  }, [selectedWariId]);
+
+  const stopLiveLocation = () => {
+    if (locationWatchRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchRef.current);
+      locationWatchRef.current = null;
+    }
+    setIsLiveLocationActive(false);
+    setLiveLocationMessage('Location tracking off');
+  };
+
+  const startLiveLocation = () => {
+    if (!selectedWariId) return setLiveLocationError('Select a Wari before starting live tracking.');
+    if (!navigator.geolocation) return setLiveLocationError('Unable to determine your current location.');
+    if (locationWatchRef.current !== null) navigator.geolocation.clearWatch(locationWatchRef.current);
+    setLiveLocationError('');
+    setLiveLocationMessage('Waiting for device location…');
+    setIsLiveLocationActive(true);
+    locationWatchRef.current = navigator.geolocation.watchPosition(async ({ coords }) => {
+      const { latitude, longitude } = coords;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        setLiveLocationError('Unable to determine your current location.');
+        return;
+      }
+      try {
+        const updated = await updateWariLocation(selectedWariId, latitude, longitude);
+        if (updated) {
+          setSelectedWari(updated);
+          setWaris((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+          setLiveLocationMessage(`Updated ${formatTimestamp(updated.last_updated) || 'just now'}`);
+        }
+      } catch (locationFailure) {
+        console.error('Unable to update live Wari location', locationFailure);
+        setLiveLocationError('Unable to update live location.');
+      }
+    }, (locationFailure) => {
+      setIsLiveLocationActive(false);
+      setLiveLocationError(locationFailure.code === 1 ? 'Location permission is required for live tracking.' : locationFailure.code === 2 ? 'Unable to determine your current location.' : 'Location request timed out.');
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
+  };
+
   useEffect(() => {
     if (!selectedWariId) return undefined;
 
@@ -265,7 +326,7 @@ export default function DindiLeaderDashboard() {
       setSelectedWari(created);
       setRegisterForm(emptyRegistration());
       setIsRegistering(false);
-      await loadDashboardData(created.id);
+      setRouteSetupWari(created);
     } catch (registerFailure) {
       console.error('Wari creation failed', registerFailure);
       setRegisterError(registerFailure?.message || 'Unable to create Wari.');
@@ -484,6 +545,22 @@ export default function DindiLeaderDashboard() {
     );
   }
 
+  if (routeSetupWari) {
+    return (
+      <RouteSetupPage
+        wariId={routeSetupWari.id}
+        wariCode={routeSetupWari.wari_code}
+        wariName={routeSetupWari.name}
+        source={routeSetupWari.source}
+        destination={routeSetupWari.destination}
+        onComplete={() => {
+          setRouteSetupWari(null);
+          void loadDashboardData(routeSetupWari.id);
+        }}
+      />
+    );
+  }
+
   if (!waris.length) {
     return (
       <div className="dindi-shell">
@@ -620,6 +697,9 @@ export default function DindiLeaderDashboard() {
             <button className="small-button" type="button" onClick={handleSaveRoute} disabled={routeLoading}>
               {routeLoading ? 'Saving route…' : 'Save route'}
             </button>
+            <button className="small-button" type="button" onClick={() => selectedWari && setRouteSetupWari(selectedWari)}>
+              Configure Route
+            </button>
           </article>
 
           <article className="card large-card">
@@ -630,6 +710,31 @@ export default function DindiLeaderDashboard() {
             </div>
           </article>
         </section>
+
+        {selectedWari ? (
+          <section className="card dindi-live-location-card">
+            <div className="dindi-live-location-heading">
+              <div>
+                <label>LIVE LOCATION</label>
+                <strong>{isLiveLocationActive ? '● Tracking' : '○ Location tracking off'}</strong>
+              </div>
+              {isLiveLocationActive ? (
+                <button type="button" className="ghost-button" onClick={stopLiveLocation}>Stop Live Location</button>
+              ) : (
+                <button type="button" className="primary-button" onClick={startLiveLocation}>Start Live Location</button>
+              )}
+            </div>
+            {selectedWari.current_lat != null && selectedWari.current_lng != null ? (
+              <div className="dindi-live-location-values">
+                <span>Latitude <strong>{Number(selectedWari.current_lat).toFixed(6)}</strong></span>
+                <span>Longitude <strong>{Number(selectedWari.current_lng).toFixed(6)}</strong></span>
+                <span>Updated <strong>{formatTimestamp(selectedWari.last_updated) || 'just now'}</strong></span>
+              </div>
+            ) : <p className="dindi-live-location-empty">No live coordinates received yet.</p>}
+            <small>{liveLocationMessage}</small>
+            {liveLocationError && <div className="inline-error">{liveLocationError}</div>}
+          </section>
+        ) : null}
 
         <section className="content-grid">
           <div className="stack-column">
@@ -980,6 +1085,15 @@ const styles = `
     grid-template-columns: 1.15fr 1fr;
   }
 
+  .dindi-live-location-card { display: grid; gap: 12px; }
+  .dindi-live-location-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .dindi-live-location-heading label { display: block; margin-bottom: 6px; }
+  .dindi-live-location-heading strong { color: var(--smartvari-emerald); font-size: 0.85rem; }
+  .dindi-live-location-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; color: var(--smartvari-muted); }
+  .dindi-live-location-values span { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--smartvari-border); border-radius: 14px; }
+  .dindi-live-location-values strong { color: var(--smartvari-text); font-size: 0.9rem; }
+  .dindi-live-location-empty { color: var(--smartvari-muted); }
+
   .stack-column {
     display: flex;
     flex-direction: column;
@@ -1322,7 +1436,7 @@ const styles = `
   @media (max-width: 980px) {
     .dindi-shell { flex-direction: column; }
     .dindi-sidebar { width: 100%; }
-    .overview-grid, .content-grid { grid-template-columns: 1fr; }
+    .overview-grid, .content-grid, .dindi-live-location-values { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 640px) {

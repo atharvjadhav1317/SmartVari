@@ -13,6 +13,8 @@ import {
   type ServiceProvider,
   type ServiceRequestRecord,
 } from '../../services/serviceProviders';
+import { getWariById } from '../../features/live-wari/services/wari';
+import { supabaseClient } from '../../features/live-wari/services/supabase';
 
 import './ServiceProviderDashboard.css';
 
@@ -91,6 +93,7 @@ export function ServiceProviderDashboard() {
   const [locationStatus, setLocationStatus] = useState('Location not set');
   const [locationError, setLocationError] = useState('');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [associatedWari, setAssociatedWari] = useState<Awaited<ReturnType<typeof getWariById>>>(null);
   const locationSectionRef = useRef<HTMLDivElement>(null);
 
   const stats = useMemo(
@@ -148,6 +151,38 @@ export function ServiceProviderDashboard() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  const associatedWariId = activeDeliveries[0]?.wari_id || requests[0]?.wari_id || history[0]?.wari_id || '';
+
+  useEffect(() => {
+    if (!associatedWariId) {
+      setAssociatedWari(null);
+      return undefined;
+    }
+    let cancelled = false;
+    let realtimeConnected = false;
+    const refresh = async () => {
+      try {
+        const next = await getWariById(associatedWariId);
+        if (!cancelled) setAssociatedWari(next);
+      } catch (error) {
+        console.error('Unable to load associated Wari location', error);
+      }
+    };
+    void refresh();
+    const channel = supabaseClient?.channel(`provider-wari-location-${associatedWariId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'waris', filter: `id=eq.${associatedWariId}` }, (payload) => {
+        realtimeConnected = true;
+        setAssociatedWari(payload.new as Awaited<ReturnType<typeof getWariById>>);
+      })
+      .subscribe();
+    const timer = window.setInterval(() => { if (!realtimeConnected) void refresh(); }, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      if (channel) void supabaseClient?.removeChannel(channel);
+    };
+  }, [associatedWariId]);
 
   const handleDetectRegistrationLocation = () => {
     if (!navigator.geolocation) {
@@ -470,6 +505,19 @@ export function ServiceProviderDashboard() {
             )}
 
             {notice && <div className="smartvari-inline-message">{notice}</div>}
+            {associatedWari ? (
+              <div className="smartvari-wari-location-card">
+                <span className="smartvari-capacity-eyebrow">WARI LIVE LOCATION</span>
+                <strong>{associatedWari.name || associatedWari.wari_code || 'Associated Wari'}</strong>
+                {associatedWari.current_lat != null && associatedWari.current_lng != null ? (
+                  <>
+                    <span>Latitude: {Number(associatedWari.current_lat).toFixed(6)}</span>
+                    <span>Longitude: {Number(associatedWari.current_lng).toFixed(6)}</span>
+                    <small>Last updated: {associatedWari.last_updated ? new Date(associatedWari.last_updated).toLocaleString() : 'Not updated yet'}</small>
+                  </>
+                ) : <small>Live coordinates are not available yet.</small>}
+              </div>
+            ) : null}
           </div>
         </aside>
 

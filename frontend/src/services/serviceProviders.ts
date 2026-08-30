@@ -53,6 +53,10 @@ export type ServiceRequestRecord = {
     name?: string | null;
     source?: string | null;
     destination?: string | null;
+    current_lat?: number | null;
+    current_lng?: number | null;
+    current_area?: string | null;
+    last_updated?: string | null;
   }[] | null;
   wari_halts?: {
     id?: string | null;
@@ -229,7 +233,7 @@ export async function listAvailableResourceRequests(providerId?: string): Promis
 
   const { data, error } = await supabaseClient
     .from('resource_request_allocations')
-    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination, current_lat, current_lng, current_area, last_updated), wari_halts(id, halt_name, latitude, longitude))')
     .eq('service_provider_id', providerId)
     .eq('status', 'PENDING')
     .order('created_at', { ascending: false });
@@ -330,7 +334,7 @@ export async function getMyActiveDeliveries(providerId: string): Promise<Service
 
   const { data, error } = await supabaseClient
     .from('resource_request_allocations')
-    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination, current_lat, current_lng, current_area, last_updated), wari_halts(id, halt_name, latitude, longitude))')
     .eq('service_provider_id', providerId)
     .in('status', ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
     .order('accepted_at', { ascending: false });
@@ -350,7 +354,7 @@ export async function getMyDeliveryHistory(providerId: string): Promise<ServiceR
 
   const { data, error } = await supabaseClient
     .from('resource_request_allocations')
-    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude))')
+    .select('*, resource_requests!inner(*, waris(id, wari_code, name, source, destination, current_lat, current_lng, current_area, last_updated), wari_halts(id, halt_name, latitude, longitude))')
     .eq('service_provider_id', providerId)
     .in('status', ['DELIVERED', 'CANCELLED'])
     .order('delivered_at', { ascending: false, nullsFirst: false });
