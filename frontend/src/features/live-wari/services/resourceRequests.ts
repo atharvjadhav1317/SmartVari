@@ -2,6 +2,7 @@ import { hasSupabaseConfig, supabaseClient } from './supabase';
 
 export type ResourceRequestType = 'FOOD' | 'WATER';
 export type ResourceRequestStatus = 'PENDING' | 'IN_PROGRESS' | 'FULFILLED' | 'CANCELLED';
+type ResourceProvider = { id?: string | null; name?: string | null };
 
 export type ResourceRequest = {
   id: string;
@@ -20,6 +21,12 @@ export type ResourceRequest = {
   notes?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  service_provider_id?: string | null;
+  delivery_status?: string | null;
+  accepted_at?: string | null;
+  delivered_at?: string | null;
+  request_provider?: ResourceProvider[] | null;
+  service_providers?: ResourceProvider | ResourceProvider[] | null;
 };
 
 export type CreateResourceRequestInput = {
@@ -43,8 +50,8 @@ export async function listLiveResourceRequests(wariId?: string): Promise<Resourc
 
   let query = supabaseClient
     .from('resource_requests')
-    .select('*')
-    .in('status', ['PENDING', 'IN_PROGRESS'])
+    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name)')
+    .in('delivery_status', ['PENDING', 'ACCEPTED', 'IN_TRANSIT', 'ARRIVED'])
     .order('requested_at', { ascending: false });
 
   if (wariId) {
@@ -57,7 +64,7 @@ export async function listLiveResourceRequests(wariId?: string): Promise<Resourc
     throw error;
   }
 
-  return (data ?? []) as ResourceRequest[];
+  return (data ?? []).map((request) => ({ ...request, request_provider: Array.isArray(request.service_providers) ? request.service_providers : request.service_providers ? [request.service_providers] : [] })) as ResourceRequest[];
 }
 
 export async function listResourceRequestHistory(wariId?: string): Promise<ResourceRequest[]> {
@@ -67,8 +74,8 @@ export async function listResourceRequestHistory(wariId?: string): Promise<Resou
 
   let query = supabaseClient
     .from('resource_requests')
-    .select('*')
-    .in('status', ['FULFILLED', 'CANCELLED'])
+    .select('*, waris(id, wari_code, name, source, destination), service_providers!resource_requests_service_provider_fkey(id, name)')
+    .in('delivery_status', ['DELIVERED', 'CANCELLED'])
     .order('fulfilled_at', { ascending: false, nullsFirst: false });
 
   if (wariId) {
@@ -81,7 +88,24 @@ export async function listResourceRequestHistory(wariId?: string): Promise<Resou
     throw error;
   }
 
-  return (data ?? []) as ResourceRequest[];
+  return (data ?? []).map((request) => ({ ...request, request_provider: Array.isArray(request.service_providers) ? request.service_providers : request.service_providers ? [request.service_providers] : [] })) as ResourceRequest[];
+}
+
+export function subscribeToResourceRequestChanges(
+  wariId: string,
+  onChange: () => void,
+  onStatus?: (status: string) => void,
+) {
+  if (!supabaseClient || !hasSupabaseConfig || !wariId.trim()) return null;
+
+  const channel = supabaseClient
+    .channel(`resource-requests-${wariId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'resource_requests', filter: `wari_id=eq.${wariId}` }, onChange)
+    .subscribe((status) => onStatus?.(status));
+
+  return () => {
+    void supabaseClient?.removeChannel(channel);
+  };
 }
 
 export async function createResourceRequest(input: CreateResourceRequestInput): Promise<ResourceRequest> {
@@ -89,25 +113,19 @@ export async function createResourceRequest(input: CreateResourceRequestInput): 
     throw new Error('Missing Supabase config');
   }
 
-  const { data, error } = await supabaseClient
-    .from('resource_requests')
-    .insert({
-      wari_id: input.wari_id,
-      halt_id: input.halt_id ?? null,
-      request_latitude: input.request_latitude ?? null,
-      request_longitude: input.request_longitude ?? null,
-      required_date: input.required_date ?? null,
-      required_time: input.required_time ?? null,
-      resource_type: (input.resource_type ?? 'FOOD').toUpperCase(),
-      quantity: Number(input.quantity) || 0,
-      unit: input.unit ?? 'units',
-      status: input.status ?? 'PENDING',
-      notes: input.notes ?? null,
-      requested_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  const { data, error } = await supabaseClient.rpc('create_resource_request_with_nearest_provider', {
+    p_wari_id: input.wari_id,
+    p_halt_id: input.halt_id ?? null,
+    p_request_latitude: input.request_latitude ?? null,
+    p_request_longitude: input.request_longitude ?? null,
+    p_required_date: input.required_date ?? null,
+    p_required_time: input.required_time ?? null,
+    p_resource_type: (input.resource_type ?? 'FOOD').toUpperCase(),
+    p_quantity: Number(input.quantity) || 0,
+    p_unit: input.unit ?? 'units',
+    p_notes: input.notes ?? null,
+    p_status: input.status ?? 'PENDING',
+  });
 
   if (error) {
     throw error;

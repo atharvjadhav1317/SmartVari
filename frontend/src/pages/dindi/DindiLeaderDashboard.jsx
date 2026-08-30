@@ -8,6 +8,7 @@ import {
   listLiveResourceRequests,
   listResourceRequestHistory,
   updateResourceRequestStatus,
+  subscribeToResourceRequestChanges,
 } from '../../features/live-wari/services/resourceRequests';
 import { fetchRoadRoute } from '../../features/live-wari/services/routing';
 
@@ -41,6 +42,19 @@ const statusTone = {
   FULFILLED: 'success',
   CANCELLED: 'danger',
 };
+
+const deliveryStages = [
+  { key: 'ACCEPTED', label: 'Accepted' },
+  { key: 'IN_TRANSIT', label: 'On the way' },
+  { key: 'ARRIVED', label: 'Arrived' },
+  { key: 'DELIVERED', label: 'Delivered' },
+];
+
+const deliveryStatusFor = (request) => request.delivery_status || (request.status === 'FULFILLED' ? 'DELIVERED' : 'PENDING');
+
+const formatRequestDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Date not set';
+const formatRequestTime = (value) => value ? new Date(`1970-01-01T${value}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time not set';
+const formatTimestamp = (value) => value ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
 
 async function geocodePlace(query) {
   const clean = String(query || '').trim();
@@ -187,6 +201,32 @@ export default function DindiLeaderDashboard() {
     setSelectedWari(selected);
     loadDashboardData(selectedWariId);
   }, [selectedWariId, waris]);
+
+  useEffect(() => {
+    if (!selectedWariId) return undefined;
+
+    let realtimeConnected = false;
+    const refreshRequests = () => {
+      Promise.all([listLiveResourceRequests(selectedWariId), listResourceRequestHistory(selectedWariId)])
+        .then(([activeRows, historyRows]) => {
+          setLiveRequests(activeRows || []);
+          setHistory(historyRows || []);
+        })
+        .catch((loadError) => console.error('Unable to refresh resource request status', loadError));
+    };
+
+    const unsubscribe = subscribeToResourceRequestChanges(selectedWariId, refreshRequests, (status) => {
+      realtimeConnected = status === 'SUBSCRIBED';
+    });
+    const fallbackTimer = window.setInterval(() => {
+      if (!realtimeConnected) refreshRequests();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(fallbackTimer);
+      unsubscribe?.();
+    };
+  }, [selectedWariId]);
 
   const refreshAll = async () => {
     await loadWaris();
@@ -368,6 +408,10 @@ export default function DindiLeaderDashboard() {
     }
     if (requestForm.locationType === 'CUSTOM' && (!Number.isFinite(latitude) || !Number.isFinite(longitude))) {
       setRequestError('Enter valid latitude and longitude for the custom location.');
+      return;
+    }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      setRequestError('The selected request location does not have valid coordinates. Choose another halt or use your current location.');
       return;
     }
 
@@ -630,15 +674,11 @@ export default function DindiLeaderDashboard() {
               </div>
               {liveRequests.length === 0 ? <div className="muted">No live requests.</div> : null}
               {liveRequests.map((request) => (
-                <div key={request.id} className="list-item request-item">
-                  <div>
-                    <strong>{request.resource_type}</strong>
-                    <span>{request.quantity} {request.unit}</span>
+                <div key={request.id} className="list-item request-item delivery-request-item">
+                  <div className="delivery-request-summary"><strong>{request.resource_type} · {request.quantity} {request.unit}</strong><span>📍 {request.waris?.[0]?.name || selectedWariName}{request.request_latitude != null && request.request_longitude != null ? ` · ${request.request_latitude}, ${request.request_longitude}` : ''}</span><span>📅 {formatRequestDate(request.required_date)} · 🕐 {formatRequestTime(request.required_time)}</span><span>Volunteer: {request.request_provider?.[0]?.name || 'Not assigned'}</span></div>
+                  <div className="dindi-delivery-progress">
+                    {deliveryStages.map((stage, index) => { const currentIndex = deliveryStages.findIndex((item) => item.key === deliveryStatusFor(request)); const complete = index < currentIndex; const current = index === currentIndex; return <div key={stage.key} className={`dindi-delivery-step ${complete ? 'complete' : ''} ${current ? 'current' : ''}`}><span>{complete ? '✓' : current ? '●' : '○'}</span><small>{stage.label}</small>{index < deliveryStages.length - 1 ? <i /> : null}</div>; })}
                   </div>
-                  <div className={`status-badge status-${statusTone[request.status] || 'info'}`}>{request.status}</div>
-                  <button type="button" className="small-button" onClick={() => handleFulfillRequest(request.id)}>
-                    Fulfill
-                  </button>
                 </div>
               ))}
             </article>
@@ -653,8 +693,9 @@ export default function DindiLeaderDashboard() {
                   <div>
                     <strong>{request.resource_type}</strong>
                     <span>{request.quantity} {request.unit}</span>
+                    <small>{request.request_provider?.[0]?.name ? `Volunteer: ${request.request_provider[0].name}` : 'Volunteer assignment unavailable'}</small>
                   </div>
-                  <div className={`status-badge status-${statusTone[request.status] || 'info'}`}>{request.status}</div>
+                  <div><div className="status-badge status-success">{request.delivery_status === 'DELIVERED' ? 'Delivered' : request.status}</div>{request.delivered_at ? <small>{formatTimestamp(request.delivered_at)}</small> : null}</div>
                 </div>
               ))}
             </article>
@@ -1110,6 +1151,45 @@ const styles = `
   .request-row textarea {
     min-height: 44px;
   }
+
+  .delivery-request-item {
+    display: grid;
+    gap: 14px;
+  }
+
+  .delivery-request-summary {
+    display: grid;
+    gap: 5px;
+  }
+
+  .delivery-request-summary span,
+  .delivery-request-item small {
+    color: var(--smartvari-muted);
+    font-size: 12px;
+  }
+
+  .dindi-delivery-progress {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    align-items: start;
+  }
+
+  .dindi-delivery-step {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    color: #cbd5e1;
+    font-size: 15px;
+    text-align: center;
+  }
+
+  .dindi-delivery-step small { color: inherit; font-size: 11px; font-weight: 700; }
+  .dindi-delivery-step.complete { color: var(--smartvari-emerald); }
+  .dindi-delivery-step.current { color: var(--smartvari-blue); }
+  .dindi-delivery-step i { position: absolute; top: 7px; left: 50%; width: 100%; height: 1px; background: var(--smartvari-border); z-index: 0; }
+  .dindi-delivery-step span, .dindi-delivery-step small { position: relative; z-index: 1; background: #fff; padding: 0 4px; }
 
   .list-card {
     display: flex;

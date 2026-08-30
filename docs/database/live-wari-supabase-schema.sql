@@ -108,6 +108,8 @@ create table if not exists public.service_providers (
   availability text not null default 'AVAILABLE',
   latitude double precision,
   longitude double precision,
+  food_capacity numeric(12,2) not null default 0,
+  water_capacity numeric(12,2) not null default 0,
   location_updated_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -119,6 +121,8 @@ alter table public.service_providers add column if not exists service_type text 
 alter table public.service_providers add column if not exists availability text default 'AVAILABLE';
 alter table public.service_providers add column if not exists latitude double precision;
 alter table public.service_providers add column if not exists longitude double precision;
+alter table public.service_providers add column if not exists food_capacity numeric(12,2) default 0;
+alter table public.service_providers add column if not exists water_capacity numeric(12,2) default 0;
 alter table public.service_providers add column if not exists location_updated_at timestamptz;
 alter table public.service_providers add column if not exists created_at timestamptz default now();
 alter table public.service_providers add column if not exists updated_at timestamptz default now();
@@ -212,6 +216,38 @@ begin
       add constraint resource_requests_service_provider_fkey
       foreign key (service_provider_id) references public.service_providers(id) on delete set null not valid;
   end if;
+
+end $$;
+
+-- Remove only accidental duplicate FKs for the same provider relationship.
+-- Other provider relationships, if any, are preserved.
+do $$
+declare
+  duplicate_fk record;
+begin
+  for duplicate_fk in
+    select constraint_name
+    from (
+      select c.conname as constraint_name,
+             row_number() over (order by c.conname) as relationship_number
+      from pg_constraint c
+      join pg_class source_table on source_table.oid = c.conrelid
+      join pg_class target_table on target_table.oid = c.confrelid
+      join pg_attribute source_column on source_column.attrelid = c.conrelid and source_column.attnum = c.conkey[1]
+      join pg_attribute target_column on target_column.attrelid = c.confrelid and target_column.attnum = c.confkey[1]
+      where c.contype = 'f'
+        and source_table.oid = 'public.resource_requests'::regclass
+        and target_table.oid = 'public.service_providers'::regclass
+        and source_column.attname = 'service_provider_id'
+        and target_column.attname = 'id'
+        and c.conname <> 'resource_requests_service_provider_fkey'
+        and array_length(c.conkey, 1) = 1
+        and array_length(c.confkey, 1) = 1
+    ) relationships
+    where relationship_number >= 1
+  loop
+    execute format('alter table public.resource_requests drop constraint if exists %I', duplicate_fk.constraint_name);
+  end loop;
 end $$;
 
 -- 5) Add/ensure CHECK constraints only if the column exists and the condition is compatible.
@@ -256,6 +292,26 @@ begin
     end if;
   end if;
 
+  if not exists (select 1 from pg_constraint where conname = 'service_providers_food_capacity_check') then
+    alter table public.service_providers add constraint service_providers_food_capacity_check check (food_capacity >= 0) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'service_providers_water_capacity_check') then
+    alter table public.service_providers add constraint service_providers_water_capacity_check check (water_capacity >= 0) not valid;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'resource_requests' and column_name = 'delivery_status'
+  ) then
+    if not exists (
+      select 1 from pg_constraint where conname = 'resource_requests_delivery_status_check'
+    ) then
+      alter table public.resource_requests
+        add constraint resource_requests_delivery_status_check
+        check (delivery_status in ('PENDING','ACCEPTED','IN_TRANSIT','ARRIVED','DELIVERED','CANCELLED')) not valid;
+    end if;
+  end if;
+
   if exists (
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'service_providers' and column_name = 'availability'
@@ -293,6 +349,80 @@ create index if not exists idx_service_providers_location on public.service_prov
 create index if not exists idx_resource_requests_wari_status on public.resource_requests (wari_id, status, requested_at desc);
 create index if not exists idx_resource_requests_halt_id on public.resource_requests (halt_id);
 create index if not exists idx_resource_requests_provider on public.resource_requests (service_provider_id, delivery_status);
+
+-- Atomically creates a request and assigns the nearest suitable available provider.
+-- Uses Haversine distance so it does not require PostGIS.
+create or replace function public.create_resource_request_with_nearest_provider(
+  p_wari_id uuid,
+  p_halt_id uuid default null,
+  p_notes text default null,
+  p_quantity numeric default 0,
+  p_request_latitude double precision default null,
+  p_request_longitude double precision default null,
+  p_required_date date default null,
+  p_required_time time default null,
+  p_resource_type text default 'FOOD',
+  p_status text default 'PENDING',
+  p_unit text default 'units'
+)
+returns public.resource_requests
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  nearest_provider_id uuid;
+  created_request public.resource_requests;
+  normalized_resource_type text := upper(coalesce(p_resource_type, 'FOOD'));
+begin
+  if p_request_latitude is null or p_request_longitude is null
+    or p_request_latitude not between -90 and 90
+    or p_request_longitude not between -180 and 180 then
+    raise exception 'A valid request latitude and longitude are required for provider matching';
+  end if;
+
+  if p_request_latitude is not null and p_request_longitude is not null then
+    select provider.id
+      into nearest_provider_id
+    from public.service_providers provider
+    where upper(coalesce(provider.availability, '')) = 'AVAILABLE'
+      and provider.latitude is not null
+      and provider.longitude is not null
+      and provider.latitude between -90 and 90
+      and provider.longitude between -180 and 180
+      and (
+        normalized_resource_type not in ('FOOD', 'WATER')
+        or (normalized_resource_type = 'FOOD' and coalesce(provider.food_capacity, 0) >= coalesce(p_quantity, 0))
+        or (normalized_resource_type = 'WATER' and coalesce(provider.water_capacity, 0) >= coalesce(p_quantity, 0))
+      )
+      and (
+        upper(coalesce(provider.service_type, 'VOLUNTEER')) in ('VOLUNTEER', 'BOTH')
+        or upper(coalesce(provider.service_type, '')) = normalized_resource_type
+      )
+    order by 6371 * acos(least(1, greatest(-1,
+      cos(radians(p_request_latitude)) * cos(radians(provider.latitude)) *
+      cos(radians(provider.longitude) - radians(p_request_longitude)) +
+      sin(radians(p_request_latitude)) * sin(radians(provider.latitude))
+    )))
+    limit 1;
+  end if;
+
+  insert into public.resource_requests (
+    wari_id, halt_id, request_latitude, request_longitude, required_date,
+    required_time, service_provider_id, resource_type, quantity, unit,
+    status, delivery_status, notes, requested_at, updated_at
+  ) values (
+    p_wari_id, p_halt_id, p_request_latitude, p_request_longitude, p_required_date,
+    p_required_time, nearest_provider_id, normalized_resource_type, coalesce(p_quantity, 0),
+    coalesce(p_unit, 'units'), coalesce(p_status, 'PENDING'), 'PENDING', p_notes, now(), now()
+  ) returning * into created_request;
+
+  return created_request;
+end;
+$$;
+
+-- Refresh PostgREST's function metadata after applying this migration.
+notify pgrst, 'reload schema';
 
 -- 7) Keep updated_at in sync without changing existing table ownership or structure.
 create or replace function public.set_updated_at()

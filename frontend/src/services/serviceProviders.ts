@@ -8,6 +8,8 @@ export type ServiceProvider = {
   availability?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  food_capacity?: number | null;
+  water_capacity?: number | null;
   location_updated_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -120,9 +122,22 @@ export async function createServiceProvider(input: {
   latitude?: number | null;
   longitude?: number | null;
   availability?: string | boolean | null;
+  food_capacity?: number | null;
+  water_capacity?: number | null;
 }): Promise<ServiceProvider> {
   if (!supabaseClient || !hasSupabaseConfig) {
     throw new Error('Missing Supabase config');
+  }
+
+  const latitude = Number(input.latitude);
+  const longitude = Number(input.longitude);
+  const foodCapacity = Number(input.food_capacity ?? 0);
+  const waterCapacity = Number(input.water_capacity ?? 0);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error('A valid latitude and longitude are required');
+  }
+  if (!Number.isFinite(foodCapacity) || foodCapacity < 0 || !Number.isFinite(waterCapacity) || waterCapacity < 0) {
+    throw new Error('Food and water capacities must be valid non-negative numbers');
   }
 
   const { data, error } = await supabaseClient
@@ -132,9 +147,10 @@ export async function createServiceProvider(input: {
       phone: input.phone ?? null,
       service_type: normalizeServiceType(input.service_type),
       availability: normalizeAvailability(input.availability),
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
-      location_updated_at: new Date().toISOString(),
+      latitude,
+      longitude,
+      food_capacity: foodCapacity,
+      water_capacity: waterCapacity,
     })
     .select()
     .single();
@@ -202,17 +218,25 @@ export async function updateServiceProviderAvailability(
   return (data ?? null) as ServiceProvider | null;
 }
 
-export async function listAvailableResourceRequests(): Promise<ServiceRequestRecord[]> {
+export async function listAvailableResourceRequests(providerId?: string): Promise<ServiceRequestRecord[]> {
   if (!supabaseClient || !hasSupabaseConfig) {
     return [];
   }
 
-  const { data, error } = await supabaseClient
+  let query = supabaseClient
     .from('resource_requests')
     .select('*, waris(id, wari_code, name, source, destination), wari_halts(id, halt_name, latitude, longitude)')
-    .is('service_provider_id', null)
     .eq('status', 'PENDING')
+    .eq('delivery_status', 'PENDING')
     .order('requested_at', { ascending: false });
+
+  if (providerId) {
+    query = query.eq('service_provider_id', providerId);
+  } else {
+    query = query.is('service_provider_id', null);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     logServiceProviderError('listAvailableResourceRequests failed', error);
@@ -240,6 +264,7 @@ export async function acceptResourceRequest(
       delivery_status: 'ACCEPTED',
     })
     .eq('id', requestId)
+    .or(`service_provider_id.is.null,service_provider_id.eq.${providerId}`)
     .select()
     .single();
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   acceptResourceRequest,
@@ -20,6 +20,9 @@ const initialProfile = {
   name: 'SmartVari Volunteer',
   phone: '',
   serviceType: 'VOLUNTEER',
+  availability: 'AVAILABLE',
+  foodCapacity: '0',
+  waterCapacity: '0',
 };
 
 const formatResourceType = (resourceType?: string | null) => {
@@ -69,7 +72,8 @@ const deliveryStages = ['ACCEPTED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
 export function ServiceProviderDashboard() {
   const [provider, setProvider] = useState<ServiceProvider | null>(null);
-  const [providerId, setProviderId] = useState('');
+  const [providers, setProviders] = useState<ServiceProvider[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState('');
   const [online, setOnline] = useState(true);
   const [requests, setRequests] = useState<ServiceRequestRecord[]>([]);
   const [activeDeliveries, setActiveDeliveries] = useState<ServiceRequestRecord[]>([]);
@@ -77,6 +81,12 @@ export function ServiceProviderDashboard() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [registrationForm, setRegistrationForm] = useState(initialProfile);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [registrationLocation, setRegistrationLocation] = useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null });
+  const [locationStatus, setLocationStatus] = useState('Location not set');
+  const [locationError, setLocationError] = useState('');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const locationSectionRef = useRef<HTMLDivElement>(null);
 
   const stats = useMemo(
     () => ({
@@ -88,12 +98,13 @@ export function ServiceProviderDashboard() {
     [requests, activeDeliveries, history],
   );
 
-  const loadAll = async () => {
+  const loadAll = async (requestedProviderId?: string) => {
     try {
       const providers = await listServiceProviders();
+      setProviders(providers);
       if (!providers.length) {
         setProvider(null);
-        setProviderId('');
+        setSelectedProviderId('');
         setOnline(true);
         setRequests([]);
         setActiveDeliveries([]);
@@ -101,13 +112,13 @@ export function ServiceProviderDashboard() {
         return;
       }
 
-      const nextProvider = providers[0];
+      const nextProvider = providers.find((item) => item.id === (requestedProviderId || selectedProviderId)) || providers[0];
       setProvider(nextProvider);
-      setProviderId(nextProvider.id || '');
+      setSelectedProviderId(nextProvider.id || '');
       setOnline(nextProvider.availability === 'AVAILABLE');
 
       const [nextRequests, nextActiveDeliveries, nextHistory] = await Promise.all([
-        listAvailableResourceRequests(),
+        listAvailableResourceRequests(nextProvider.id),
         getMyActiveDeliveries(nextProvider.id),
         getMyDeliveryHistory(nextProvider.id),
       ]);
@@ -123,9 +134,45 @@ export function ServiceProviderDashboard() {
     }
   };
 
+  const handleProviderChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextProviderId = event.target.value;
+    setSelectedProviderId(nextProviderId);
+    void loadAll(nextProviderId);
+  };
+
   useEffect(() => {
     void loadAll();
   }, []);
+
+  const handleDetectRegistrationLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Location is not available in this browser.');
+      setLocationStatus('Location not set');
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    setLocationError('');
+    setLocationStatus('Detecting location...');
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setRegistrationLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        setLocationStatus('Location detected');
+        setIsDetectingLocation(false);
+      },
+      (error) => {
+        const message = error.code === error.PERMISSION_DENIED
+          ? 'Location permission was denied. Allow location access in your browser and try again.'
+          : error.code === error.POSITION_UNAVAILABLE
+            ? 'Your location could not be determined. Check your device location settings and try again.'
+            : 'Location request timed out. Please try again.';
+        setLocationError(message);
+        setLocationStatus('Location not set');
+        setIsDetectingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  };
 
   const handleRegister = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -135,35 +182,63 @@ export function ServiceProviderDashboard() {
       return;
     }
 
+    const foodCapacity = Number(registrationForm.foodCapacity);
+    const waterCapacity = Number(registrationForm.waterCapacity);
+    if (!Number.isFinite(foodCapacity) || foodCapacity < 0 || !Number.isFinite(waterCapacity) || waterCapacity < 0) {
+      setNotice('Food and water capacities must be numbers greater than or equal to zero.');
+      return;
+    }
+
+    if (registrationLocation.latitude === null || registrationLocation.longitude === null) {
+      setNotice('Please set your current location before registering.');
+      locationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     try {
       const created = await createServiceProvider({
         name: registrationForm.name,
         phone: registrationForm.phone || null,
         service_type: registrationForm.serviceType || 'VOLUNTEER',
-        availability: 'AVAILABLE',
+        availability: registrationForm.availability,
+        latitude: registrationLocation.latitude,
+        longitude: registrationLocation.longitude,
+        food_capacity: foodCapacity,
+        water_capacity: waterCapacity,
       });
 
       setProvider(created);
-      setProviderId(created.id || '');
+      setSelectedProviderId(created.id || '');
       setOnline(true);
       setRegistrationForm(initialProfile);
+      setRegistrationLocation({ latitude: null, longitude: null });
+      setLocationStatus('Location not set');
+      setLocationError('');
+      setRegistrationOpen(false);
       setNotice('Volunteer profile created.');
-      await loadAll();
+      await loadAll(created.id);
     } catch (error) {
-      console.error('Unable to create volunteer profile', error);
+      const details = error as { code?: string; message?: string; details?: string; hint?: string };
+      console.error('Unable to create volunteer profile', {
+        error,
+        code: details?.code,
+        message: details?.message,
+        details: details?.details,
+        hint: details?.hint,
+      });
       setNotice('Unable to create volunteer profile.');
     }
   };
 
   const handleToggleAvailability = async () => {
-    if (!providerId) {
+    if (!selectedProviderId) {
       return;
     }
 
     const nextStatus = online ? 'OFFLINE' : 'AVAILABLE';
 
     try {
-      await updateServiceProviderAvailability(providerId, nextStatus);
+      await updateServiceProviderAvailability(selectedProviderId, nextStatus);
       setOnline(!online);
       setProvider((current) => (current ? { ...current, availability: nextStatus } : current));
       setNotice(nextStatus === 'AVAILABLE' ? 'Volunteer is now available.' : 'Volunteer is now offline.');
@@ -174,12 +249,12 @@ export function ServiceProviderDashboard() {
   };
 
   const handleAcceptRequest = async (requestId: string) => {
-    if (!providerId) {
+    if (!selectedProviderId) {
       return;
     }
 
     try {
-      await acceptResourceRequest(requestId, providerId);
+      await acceptResourceRequest(requestId, selectedProviderId);
       setNotice('Request accepted and assigned to you.');
       await loadAll();
     } catch (error) {
@@ -210,7 +285,7 @@ export function ServiceProviderDashboard() {
   };
 
   const handleUpdateLocation = () => {
-    if (!providerId || !navigator.geolocation) {
+    if (!selectedProviderId || !navigator.geolocation) {
       setNotice('Location is not available in this browser.');
       return;
     }
@@ -218,7 +293,7 @@ export function ServiceProviderDashboard() {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
-          const updated = await updateServiceProviderLocation(providerId, coords.latitude, coords.longitude);
+          const updated = await updateServiceProviderLocation(selectedProviderId, coords.latitude, coords.longitude);
           if (updated) setProvider(updated);
           setNotice('Volunteer location updated.');
         } catch (error) {
@@ -251,7 +326,7 @@ export function ServiceProviderDashboard() {
             <button className="smartvari-secondary-btn" type="button" onClick={() => void loadAll()}>
               Refresh feed
             </button>
-            <button className="smartvari-primary-btn" type="button" onClick={() => setNotice('Use the registration form in the volunteer status panel.') }>
+            <button className="smartvari-primary-btn" type="button" onClick={() => setRegistrationOpen(true)}>
               Register volunteer
             </button>
           </div>
@@ -268,6 +343,14 @@ export function ServiceProviderDashboard() {
           </div>
 
           <div className="smartvari-panel-body">
+            {providers.length > 0 && (
+              <label className="smartvari-provider-selector">
+                Select provider
+                <select value={selectedProviderId} onChange={handleProviderChange}>
+                  {providers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+            )}
             {provider ? (
               <>
                 <div className="smartvari-provider-card">
@@ -533,6 +616,40 @@ export function ServiceProviderDashboard() {
           </section>
         </main>
       </div>
+
+      {registrationOpen && (
+        <div className="smartvari-modal-backdrop" role="presentation" onMouseDown={() => setRegistrationOpen(false)}>
+          <section className="smartvari-registration-modal" role="dialog" aria-modal="true" aria-labelledby="register-volunteer-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="smartvari-modal-header">
+              <div>
+                <span className="smartvari-micro-label">SERVICE PROVIDER</span>
+                <h2 id="register-volunteer-title">Register volunteer</h2>
+              </div>
+              <button className="smartvari-modal-close" type="button" onClick={() => setRegistrationOpen(false)} aria-label="Close registration form">×</button>
+            </div>
+            <form className="smartvari-form" onSubmit={handleRegister}>
+              <label className="smartvari-form-field">Volunteer name<input value={registrationForm.name} onChange={(event) => setRegistrationForm((current) => ({ ...current, name: event.target.value }))} placeholder="Volunteer name" required /></label>
+              <label className="smartvari-form-field">Phone<input value={registrationForm.phone} onChange={(event) => setRegistrationForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone number" /></label>
+              <label className="smartvari-form-field">Service type<select value={registrationForm.serviceType} onChange={(event) => setRegistrationForm((current) => ({ ...current, serviceType: event.target.value }))}><option value="VOLUNTEER">Volunteer</option><option value="FOOD">Food support</option><option value="WATER">Water support</option><option value="BOTH">Food + Water</option><option value="MEDICAL">Medical support</option></select></label>
+              <label className="smartvari-form-field">Availability<select value={registrationForm.availability} onChange={(event) => setRegistrationForm((current) => ({ ...current, availability: event.target.value }))}><option value="AVAILABLE">Available</option><option value="BUSY">Busy</option><option value="OFFLINE">Offline</option></select></label>
+              <div className="smartvari-form-field" ref={locationSectionRef}>
+                <span>Location</span>
+                <button className="smartvari-primary-btn" type="button" onClick={handleDetectRegistrationLocation} disabled={isDetectingLocation}>
+                  {isDetectingLocation ? 'Detecting location...' : 'Use current location'}
+                </button>
+                <small className={locationError ? 'smartvari-location-error' : 'smartvari-location-status'}>
+                  {locationError || (registrationLocation.latitude !== null && registrationLocation.longitude !== null
+                    ? `✓ ${locationStatus} · ${registrationLocation.latitude.toFixed(8)}, ${registrationLocation.longitude.toFixed(8)}`
+                    : locationStatus)}
+                </small>
+              </div>
+              <label className="smartvari-form-field">Food capacity<input type="number" min="0" step="any" value={registrationForm.foodCapacity} onChange={(event) => setRegistrationForm((current) => ({ ...current, foodCapacity: event.target.value }))} /></label>
+              <label className="smartvari-form-field">Water capacity<input type="number" min="0" step="any" value={registrationForm.waterCapacity} onChange={(event) => setRegistrationForm((current) => ({ ...current, waterCapacity: event.target.value }))} /></label>
+              <div className="smartvari-modal-actions"><button className="smartvari-secondary-btn" type="button" onClick={() => setRegistrationOpen(false)}>Cancel</button><button className="smartvari-primary-btn" type="submit">Register volunteer</button></div>
+            </form>
+          </section>
+        </div>
+      )}
 
       {loading && <div className="smartvari-inline-message">Loading volunteer operations…</div>}
     </div>

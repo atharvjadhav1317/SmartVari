@@ -399,6 +399,25 @@
   margin-top: 12px;
 }
 
+.smartvari-provider-selector {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.smartvari-provider-selector select {
+  width: 100%;
+  padding: 10px 11px;
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  font: inherit;
+}
+
 .smartvari-progress {
   display: grid;
   gap: 5px;
@@ -461,6 +480,39 @@
   background: rgba(249, 115, 22, 0.08);
   color: #9a4d00;
 }
+
+.smartvari-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(5px);
+}
+
+.smartvari-registration-modal {
+  width: min(460px, 100%);
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.2);
+}
+
+.smartvari-modal-header,
+.smartvari-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.smartvari-modal-header { margin-bottom: 18px; }
+.smartvari-modal-header h2 { margin: 5px 0 0; font-size: 1.35rem; letter-spacing: -0.04em; }
+.smartvari-modal-close { border: 0; color: #64748b; background: transparent; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+.smartvari-modal-actions { justify-content: flex-end; margin-top: 6px; }
 
 @media (max-width: 980px) {
   .smartvari-provider-content {
